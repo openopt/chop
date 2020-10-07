@@ -9,9 +9,9 @@ import numpy as np
 the COPT project, https://github.com/openopt/copt."""
 
 
-def euclidean_proj_simplex(v, s=1.0):
+def euclidean_proj_simplex(v, s=1.):
     r""" Compute the Euclidean projection on a positive simplex
-  Solves the optimisation problem (using the algorithm from [1]):
+  Solves the optimization problem (using the algorithm from [1]):
       min_w 0.5 * || w - v ||_2^2 , s.t. \sum_i w_i = s, w_i >= 0
   Parameters
   ----------
@@ -96,6 +96,11 @@ class LpBall:
             raise ValueError("Invalid constraint size alpha: {}".format(alpha))
         self.alpha = alpha
 
+    def fw_gap(self, grad, iterate):
+        update_direction, _ = self.lmo(-grad, iterate)
+        return -grad.dot(update_direction)
+
+
 class LinfBall(LpBall):
     def __init__(self, alpha):
         super(LinfBall, self).__init__(alpha)
@@ -104,6 +109,11 @@ class LinfBall(LpBall):
         if torch.max(abs(x)) <= self.alpha:
             return x
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
+
+    def lmo(self, grad, iterate):
+        update_direction = -iterate.clone().detach()
+        update_direction += self.alpha * torch.sign(grad)
+        return update_direction, 1.
 
 
 class L1Ball(LpBall):
@@ -119,7 +129,8 @@ class L1Ball(LpBall):
         abs_grad = abs(grad)
         largest_coordinate = torch.argmax(abs_grad)
 
-        update_direction[largest_coordinate] += self.alpha * torch.sign(grad[largest_coordinate])
+        update_direction[largest_coordinate] += self.alpha * torch.sign(
+            grad[largest_coordinate])
 
         return update_direction, 1.
 
@@ -135,6 +146,13 @@ class L2Ball(LpBall):
         if norm <= self.alpha:
             return x
         return x / torch.norm(x)
+
+    def lmo(self, grad, iterate):
+        update_direction = iterate.clone().detach()
+        grad_norm = (grad ** 2).sum()
+        update_direction += self.alpha * grad / grad_norm
+        return update_direction, 1
+
 
 def make_LpBall(alpha, p=1):
     if p == 1:
