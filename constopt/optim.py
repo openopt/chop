@@ -87,6 +87,7 @@ class FrankWolfe(Optimizer):
         """Performs a single optimization step
         
         Arguments:
+            step_size: Ignored by this optimizer
             closure (callable, optional): A closure that reevaluates the model
             and returns the loss"""
 
@@ -110,7 +111,6 @@ class FrankWolfe(Optimizer):
 
                 update_direction, _ = self.lmo(-p.grad, p)
                 p += (2. / (state['step'] + 2.)) * update_direction
-                print((p ** 2).sum())
         return loss
 
 

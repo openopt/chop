@@ -1,6 +1,6 @@
 """Testing our adversarial attacks"""
 import pytest
-
+import shutil
 import torch
 from torch import nn
 
@@ -11,6 +11,7 @@ from constopt import optim
 from constopt.adversary import Adversary
 
 OUT_DIR = "logging/tests/test_adversary/"
+shutil.rmtree(OUT_DIR, ignore_errors=True)
 torch.manual_seed(0)
 
 data = torch.rand((1, 25, 25))
@@ -30,7 +31,7 @@ class LinearModel(nn.Module):
 
 @pytest.mark.parametrize('algorithm', [optim.PGD, optim.PGDMadry,
                                        optim.FrankWolfe, optim.MomentumFrankWolfe])
-@pytest.mark.parametrize('step_size', [.1, .05, .001, 0.])
+@pytest.mark.parametrize('step_size', [1, .5, .1, .05, .001, 0.])
 def test_adversary(algorithm, step_size):
     # Setup
     model = LinearModel()
@@ -52,5 +53,6 @@ def test_adversary(algorithm, step_size):
     output = model(data)
     loss = criterion(output, target)
     # Run perturbation
-    adv_loss, delta = adv.perturb(data, target, model, criterion, step_size, iterations=100, store=store)
+    adv_loss, delta = adv.perturb(data, target, model, criterion, step_size, iterations=100, 
+                                  tol=1e-5, store=store)
     # print(delta)

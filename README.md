@@ -1,5 +1,5 @@
 # ConstOpt-PyTorch: a library for constrained optimization built on PyTorch
- ...with applications to Adversarially Training Neural Networks
+ ...with applications to Adversarially Training Neural Networks.
 
 ### Example
 
