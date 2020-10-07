@@ -1,0 +1,17 @@
+name: constopt
+channels:
+ - pytorch
+dependencies:
+ - python=3
+ - pytorch
+ - cudatoolkit
+ - tensorboard
+ - jupyter
+ - torchvision
+ - pylint
+ - pytest
+ - rope
+ - pip
+ - pip:
+   - copt
+   - advertorch
