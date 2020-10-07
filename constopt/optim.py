@@ -7,9 +7,10 @@ https://github.com/openopt/copt"""
 class PGD(Optimizer):
     """Projected Gradient Descent"""
 
-    def __init__(self, params, prox):
-        self.prox = prox
-        defaults = dict(prox=prox)
+    def __init__(self, params, constraint):
+        self.prox = constraint.prox
+        self.name = 'PGD'
+        defaults = dict(prox=self.prox, name=self.name)
         super(PGD, self).__init__(params, defaults)
 
     @torch.no_grad()
@@ -39,10 +40,11 @@ class PGD(Optimizer):
 class PGDMadry(Optimizer):
     """What Madry et al. call PGD"""
 
-    def __init__(self, params, prox, lmo):
-        self.prox = prox
-        self.lmo = lmo
-        defaults = dict(prox=prox, lmo=lmo)
+    def __init__(self, params, constraint):
+        self.prox = constraint.prox
+        self.lmo = constraint.lmo
+        self.name = 'PGD-Madry'
+        defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
         super(PGDMadry, self).__init__(params, defaults)
 
     @torch.no_grad()
@@ -74,9 +76,10 @@ class PGDMadry(Optimizer):
 class FrankWolfe(Optimizer):
     """Vanilla Frank-Wolfe algorithm"""
 
-    def __init__(self, params, lmo):
-        self.lmo = lmo
-        defaults = dict(lmo=lmo)
+    def __init__(self, params, constraint):
+        self.lmo = constraint.lmo
+        self.name = 'Vanilla-FW'
+        defaults = dict(lmo=self.lmo, name=self.name)
         super(FrankWolfe, self).__init__(params, defaults)
 
     @torch.no_grad()
@@ -107,15 +110,17 @@ class FrankWolfe(Optimizer):
 
                 update_direction, _ = self.lmo(-p.grad, p)
                 p += (2. / (state['step'] + 2.)) * update_direction
+                print((p ** 2).sum())
         return loss
 
 
 class MomentumFrankWolfe(Optimizer):
     """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al"""
 
-    def __init__(self, params, lmo):
-        self.lmo = lmo
-        defaults = dict(lmo=lmo)
+    def __init__(self, params, constraint):
+        self.lmo = constraint.lmo
+        self.name = 'Momentum-FW'
+        defaults = dict(lmo=self.lmo, name=self.name)
         super(MomentumFrankWolfe, self).__init__(params, defaults)
 
 
@@ -144,7 +149,7 @@ class MomentumFrankWolfe(Optimizer):
                     state['grad_estimate'] = torch.zeros_like(
                         p, memory_format=torch.preserve_format)
 
-                state['step'] += 1
+                state['step'] += 1.
                 state['grad_estimate'] += ((1. / (state['step'] + 1)) ** (1/3)
                                            * (grad - state['grad_estimate']))
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)

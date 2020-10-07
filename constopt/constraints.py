@@ -98,12 +98,13 @@ class LpBall:
 
     def fw_gap(self, grad, iterate):
         update_direction, _ = self.lmo(-grad, iterate)
-        return -grad.dot(update_direction)
+        return (-grad * update_direction).sum()
 
 
 class LinfBall(LpBall):
     def __init__(self, alpha):
         super(LinfBall, self).__init__(alpha)
+        self.p = np.inf
 
     def prox(self, x, step_size=None):
         if torch.max(abs(x)) <= self.alpha:
@@ -120,6 +121,7 @@ class L1Ball(LpBall):
 
     def __init__(self, alpha):
         super(L1Ball, self).__init__(alpha)
+        self.p = 1
 
     def lmo(self, grad, iterate):
         """Returns s-x, x solving the linear problem
@@ -127,7 +129,7 @@ class L1Ball(LpBall):
         """
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
-        largest_coordinate = torch.argmax(abs_grad)
+        largest_coordinate = torch.where(abs_grad == abs_grad.max())
 
         update_direction[largest_coordinate] += self.alpha * torch.sign(
             grad[largest_coordinate])
@@ -140,6 +142,7 @@ class L1Ball(LpBall):
 class L2Ball(LpBall):
     def __init__(self, alpha):
         super(L2Ball, self).__init__(alpha)
+        self.p = 2
 
     def prox(self, x, step_size=None):
         norm = torch.norm(x)
