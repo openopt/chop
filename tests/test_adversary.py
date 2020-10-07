@@ -3,7 +3,7 @@ import pytest
 import shutil
 import torch
 from torch import nn
-
+import numpy as np
 from cox.store import Store
 
 import constopt
@@ -12,11 +12,6 @@ from constopt.adversary import Adversary
 
 OUT_DIR = "logging/tests/test_adversary/"
 shutil.rmtree(OUT_DIR, ignore_errors=True)
-torch.manual_seed(0)
-
-data = torch.rand((1, 25, 25))
-target = torch.zeros(1).long()
-
 
 class LinearModel(nn.Module):
     def __init__(self):
@@ -32,27 +27,34 @@ class LinearModel(nn.Module):
 @pytest.mark.parametrize('algorithm', [optim.PGD, optim.PGDMadry,
                                        optim.FrankWolfe, optim.MomentumFrankWolfe])
 @pytest.mark.parametrize('step_size', [1, .5, .1, .05, .001, 0.])
-def test_adversary(algorithm, step_size):
+@pytest.mark.parametrize('p', [1, 2, np.inf])
+def test_adversary(algorithm, step_size, p):
     # Setup
+    torch.manual_seed(0)
+
+    data = torch.rand((1, 25, 25))
+    target = torch.zeros(1).long()
+
     model = LinearModel()
     criterion = nn.CrossEntropyLoss()
-    constraint = constopt.constraints.make_LpBall(alpha=1., p=1)
+    constraint = constopt.constraints.make_LpBall(alpha=1., p=p)
 
     adv = Adversary(data.shape, constraint, algorithm)
     optimizer = adv.optimizer
     # Logging
 
     store = Store(OUT_DIR)
-    store.add_table('metadata', {'algorithm': str, 'step-size': float})
+    store.add_table('metadata', {'algorithm': str, 'step-size': float, 'p': float})
 
-    store['metadata'].append_row({'algorithm': optimizer.name, 'step-size': step_size})
-    store.add_table(optimizer.name, {'func_val': float, 'FW gap': float,
-                                     'norm delta': float})
+    store['metadata'].append_row({'algorithm': optimizer.name, 'step-size': step_size,
+                                  'p': p})
+    table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
+    store.add_table(table_name, {'func_val': float, 'FW gap': float,
+                                                  'norm delta': float})
 
     # Get nominal loss
     output = model(data)
     loss = criterion(output, target)
     # Run perturbation
     adv_loss, delta = adv.perturb(data, target, model, criterion, step_size, iterations=100, 
-                                  tol=1e-5, store=store)
-    # print(delta)
+                                  tol=1e-7, store=store)

@@ -54,8 +54,11 @@ def test_L1Ball(algorithm, step_size):
         optimizer.zero_grad()
         loss = criterion(X.mv(w_t), y)
         loss.backward()
+
+        # Compute gap
         with torch.no_grad():
             gap = constraint.fw_gap(w_t.grad, w_t)
+
         optimizer.step(step_size)
         store.log_table_and_tb(optimizer.name, {'func_val': loss.item(),
                                                 'FW gap': gap.item(),

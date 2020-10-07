@@ -26,21 +26,34 @@ class Adversary:
             self.optimizer.zero_grad()
             output = model(data + self.delta)
             loss = -criterion(output, target)
+            print(loss.item())
             loss.backward()
 
             with torch.no_grad():
                 gap = self.constraint.fw_gap(self.delta.grad, self.delta)
-            if store:
-                # Might be better to use the same name for all optimizers, to get
-                # only one plot
-                store.log_table_and_tb(self.optimizer.name,
-                                    {'func_val': -loss.item(),
-                                        'FW gap': gap.item(),
-                                        'norm delta': abs(self.delta).sum()
-                                        })
-                store[self.optimizer.name].flush_row()
 
             self.optimizer.step(step_size)
             ii += 1
+
+            # Logging
+            if store:
+                # Might be better to use the same name for all optimizers, to get
+                # only one plot
+                def norm(x):
+                    if self.constraint.p == 1:
+                        return abs(x).sum()
+                    if self.constraint.p == 2:
+                        return (x ** 2).sum()
+                    if self.constraint.p == np.inf:
+                        return abs(x).max()
+                    raise NotImplementedError("We've only implemented p = 1, 2, np.inf")
+                p = self.constraint.p
+                table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
+                store.log_table_and_tb(table_name,
+                                       {'func_val': -loss.item(),
+                                        'FW gap': gap.item(),
+                                        'norm delta': norm(self.delta)
+                                        })
+                store[table_name].flush_row()
 
         return loss, self.delta
