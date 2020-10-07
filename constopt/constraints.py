@@ -137,7 +137,9 @@ class L1Ball(LpBall):
         return update_direction, 1.
 
     def prox(self, x, step_size=None):
-        return euclidean_proj_l1ball(x, self.alpha)
+        shape = x.shape
+        x = euclidean_proj_l1ball(x.view(-1), self.alpha)
+        return x.view(*shape)
 
 class L2Ball(LpBall):
     def __init__(self, alpha):
