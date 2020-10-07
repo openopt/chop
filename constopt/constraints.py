@@ -124,7 +124,7 @@ class L1Ball(LpBall):
         self.p = 1
 
     def lmo(self, grad, iterate):
-        """Returns s-x, x solving the linear problem
+        """Returns s-x, s solving the linear problem
         max_{\|s\|_1 <= \\alpha} \\langle grad, s\\rangle
         """
         update_direction = -iterate.clone().detach()
@@ -141,22 +141,27 @@ class L1Ball(LpBall):
         x = euclidean_proj_l1ball(x.view(-1), self.alpha)
         return x.view(*shape)
 
+
+# TODO: Fix L2 Ball
 class L2Ball(LpBall):
     def __init__(self, alpha):
         super(L2Ball, self).__init__(alpha)
         self.p = 2
 
     def prox(self, x, step_size=None):
-        norm = torch.norm(x)
+        norm = torch.sqrt((x ** 2).sum())
         if norm <= self.alpha:
             return x
-        return x / torch.norm(x)
+        return self.alpha * x / norm
 
     def lmo(self, grad, iterate):
+        """Returns s-x, s solving the linear problem
+        max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
+        """
         update_direction = iterate.clone().detach()
-        grad_norm = (grad ** 2).sum()
+        grad_norm = torch.sqrt((grad ** 2).sum())
         update_direction += self.alpha * grad / grad_norm
-        return update_direction, 1
+        return update_direction, 1.
 
 
 def make_LpBall(alpha, p=1):
