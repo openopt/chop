@@ -4,8 +4,11 @@ import numpy as np
 
 
 class Adversary:
-    def __init__(self, shape, constraint, optimizer_class):
-        self.delta = Variable(torch.zeros(shape), requires_grad=True)
+    def __init__(self, shape, constraint, optimizer_class, random_init=False):
+        if random_init:
+            self.delta = Variable(constraint.random_point(shape), requires_grad=True)
+        else:
+            self.delta = Variable(torch.zeros(shape), requires_grad=True)
         self.optimizer = optimizer_class([self.delta], constraint)
         self.constraint = constraint
 
@@ -43,7 +46,7 @@ class Adversary:
                     if self.constraint.p == 1:
                         return abs(x).sum()
                     if self.constraint.p == 2:
-                        return (x ** 2).sum()
+                        return torch.sqrt((x ** 2).sum())
                     if self.constraint.p == np.inf:
                         return abs(x).max()
                     raise NotImplementedError("We've only implemented p = 1, 2, np.inf")

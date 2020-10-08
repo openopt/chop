@@ -1,8 +1,8 @@
 import torch
-from torch.optim import Optimizer
 
 import numpy as np
-
+from scipy.stats import expon
+from torch.distributions import Laplace, Normal
 # TODO: Add projections to the constraints, and write ProjectedOptimizer wrapper/decorator
 
 """This uses an API similar to the one for
@@ -100,11 +100,25 @@ class LpBall:
         update_direction, _ = self.lmo(-grad, iterate)
         return (-grad * update_direction).sum()
 
+    def random_point(self, shape):
+        """
+        Sample uniformly from the constraint set.
+        L1 and L2 are implemented here.
+        Linf implemented in the subclass.
+        https://arxiv.org/abs/math/0503650
+        """
+        if self.p == 2:
+            distrib = Normal(0, 1)
+        elif self.p == 1:
+            distrib = Laplace(0, 1)
+        x = distrib.sample(shape)
+        e = expon(.5).rvs()
+        denom = (e + (x ** 2).sum()) ** .5
+        return self.alpha * x / denom
+
 
 class LinfBall(LpBall):
-    def __init__(self, alpha):
-        super(LinfBall, self).__init__(alpha)
-        self.p = np.inf
+    p = np.inf
 
     def prox(self, x, step_size=None):
         if torch.max(abs(x)) <= self.alpha:
@@ -115,13 +129,14 @@ class LinfBall(LpBall):
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
         return update_direction, 1.
+    
+    def random_point(self, shape):
+        """Returns a point of given shape uniformly at random from the constraint set."""
+        return self.alpha * torch.FloatTensor(*shape).uniform_(-1, 1)
 
 
 class L1Ball(LpBall):
-
-    def __init__(self, alpha):
-        super(L1Ball, self).__init__(alpha)
-        self.p = 1
+    p = 1
 
     def lmo(self, grad, iterate):
         """Returns s-x, s solving the linear problem
@@ -142,11 +157,9 @@ class L1Ball(LpBall):
         return x.view(*shape)
 
 
-# TODO: Fix L2 Ball
+# TODO: #1 Fix L2 Ball
 class L2Ball(LpBall):
-    def __init__(self, alpha):
-        super(L2Ball, self).__init__(alpha)
-        self.p = 2
+    p = 2
 
     def prox(self, x, step_size=None):
         norm = torch.sqrt((x ** 2).sum())
@@ -155,13 +168,15 @@ class L2Ball(LpBall):
         return self.alpha * x / norm
 
     def lmo(self, grad, iterate):
-        """Returns s-x, s solving the linear problem
+        """
+        Returns s-x, s solving the linear problem
         max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
         """
         update_direction = iterate.clone().detach()
         grad_norm = torch.sqrt((grad ** 2).sum())
         update_direction += self.alpha * grad / grad_norm
         return update_direction, 1.
+
 
 
 def make_LpBall(alpha, p=1):
@@ -175,3 +190,20 @@ def make_LpBall(alpha, p=1):
     
     raise NotImplementedError("We have only implemented ord={1, 2, np.inf} for now.")
     
+
+class Simplex:
+
+    def prox(self, x, step_size=None):
+        shape = x.shape
+        x = euclidean_proj_simplex(x.view(-1), self.alpha)
+        return x.view(*shape)
+
+    def lmo(self, grad, iterate):
+        largest_coordinate = torch.where(grad == grad.max())
+
+        update_direction = -iterate.clone().detach()
+        update_direction[largest_coordinate] += self.alpha * torch.sign(
+            grad[largest_coordinate]
+        )
+
+        return update_direction, 1.
