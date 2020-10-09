@@ -4,17 +4,20 @@ import numpy as np
 
 
 class Adversary:
-    def __init__(self, shape, constraint, optimizer_class, random_init=False):
+    def __init__(self, shape, constraint, optimizer_class, device=None, random_init=False):
         if random_init:
-            self.delta = Variable(constraint.random_point(shape), requires_grad=True)
+            self.delta = Variable(constraint.random_point(shape))
         else:
-            self.delta = Variable(torch.zeros(shape), requires_grad=True)
+            self.delta = Variable(torch.zeros(shape))
+        self.delta = self.delta.to(device)
+        self.delta.requires_grad = True
         self.optimizer = optimizer_class([self.delta], constraint)
         self.constraint = constraint
 
     def perturb(self, data, target, model, criterion,
                 step_size, tol=1e-3, iterations=None,
                 store=None):
+
         model.eval()
         ii = 0
         if "FW" in self.optimizer.name:
