@@ -44,7 +44,7 @@ def euclidean_proj_simplex(v, s=1.):
     u, _ = torch.sort(v, descending=True)
     cssv = torch.cumsum(u, dim=-1)
     # get the number of > 0 components of the optimal solution
-    rho = torch.nonzero(u * np.arange(1, n + 1) > (cssv - s))[-1]
+    rho = torch.nonzero(u * torch.arange(1, n + 1, device=v.device) > (cssv - s))[-1]
     # compute the Lagrange multiplier associated to the simplex constraint
     theta = (cssv[rho] - s) / (rho + 1.0)
     # compute the projection by thresholding v using theta
@@ -86,7 +86,7 @@ def euclidean_proj_l1ball(v, s=1.):
     # project *u* on the simplex
     w = euclidean_proj_simplex(u, s=s)
     # compute the solution to the original problem on v
-    w *= np.sign(v)
+    w *= torch.sign(v)
     return w
 
 

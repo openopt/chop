@@ -112,19 +112,27 @@ def test_adversary_mnist(algorithm, step_size, p, random_init, model_filename):
     # Logging
 
     store = Store(os.path.join(OUT_DIR, "test_mnist/"))
-    store.add_table('metadata', {'algorithm': str, 'step-size': float, 'p': float})
+    store.add_table('metadata', {'algorithm': str,
+                                 'step-size': float,
+                                 'p': float,
+                                 'training_mode': str,
+                                 'random_init': int})
 
-    store['metadata'].append_row({'algorithm': optimizer.name, 'step-size': step_size,
-                                  'p': p})
+    mode = 'adv' if 'adv' in model_filename else 'cln'
+    store['metadata'].append_row({'algorithm': optimizer.name,
+                                  'step-size': step_size,
+                                  'p': p,
+                                  'training_mode': mode,
+                                  'random_init': int(random_init)})
+
     table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
     store.add_table(table_name, {'func_val': float, 'FW gap': float,
-                                                  'norm delta': float})
+                                 'norm delta': float})
 
     # Get nominal loss
-    output = model(data)
-    loss = criterion(output, target)
-    # Run perturbation
-    adv_loss, delta = adv.perturb(data, target, model, criterion, step_size, iterations=100, 
+    # output = model(data)
+    # loss = criterion(output, target)
+    # Run and log perturbation
+    adv_loss, delta = adv.perturb(data, target, model, criterion, step_size,
+                                  iterations=100,
                                   tol=1e-7, store=store)
-
-
