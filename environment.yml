@@ -18,3 +18,4 @@ dependencies:
    - dill
    - copt
    - advertorch
+   - easydict

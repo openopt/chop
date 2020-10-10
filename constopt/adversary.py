@@ -11,17 +11,19 @@ class Adversary:
             self.delta = Variable(torch.zeros(shape))
         self.delta = self.delta.to(device)
         self.delta.requires_grad = True
-        self.optimizer = optimizer_class([self.delta], constraint)
+        self.optimizer = optimizer_class([self.delta], constraint) if optimizer_class is not None else None
         self.constraint = constraint
 
     def perturb(self, data, target, model, criterion,
                 step_size, tol=1e-3, iterations=None,
                 store=None):
 
+        if self.optimizer is None:
+            return criterion(model(data), target), 0.
+        was_training = model.training
         model.eval()
         ii = 0
         if "FW" in self.optimizer.name:
-            print("FW")
             step_size = 0.
 
         gap = torch.tensor(np.inf)
@@ -60,5 +62,8 @@ class Adversary:
                                         'norm delta': norm(self.delta)
                                         })
                 store[table_name].flush_row()
+
+        if was_training:
+            model.train()
 
         return adv_loss, self.delta

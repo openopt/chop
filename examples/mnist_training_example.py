@@ -2,13 +2,15 @@ import numpy as np
 import torch
 from torch import nn
 
+from easydict import EasyDict
+
 from advertorch.test_utils import LeNet5
 from advertorch_examples.utils import get_mnist_train_loader
 from advertorch_examples.utils import get_mnist_test_loader
 
 import constopt
 from constopt.adversary import Adversary
-from constopt.optim import PGD
+from constopt.optim import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
 
 # Setup
 torch.manual_seed(0)
@@ -30,16 +32,20 @@ nb_epochs = 10
 optimizer = torch.optim.SGD(model.parameters(), lr=.1, momentum=.9)
 
 # Inner optimization parameters
-eps = 1.
+eps = 0.3
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
-inner_iter = 20
+inner_iter = 3
+inner_iter_test = 10
 step_size = 2 * eps / inner_iter
+step_size_test = 2 * eps / inner_iter_test
 
 # Logging
 losses = []
 accuracies = []
 adv_losses = []
 adv_accuracies = []
+
+adv_opt_class = PGDMadry
 
 # Training loop
 for epoch in range(nb_epochs):
@@ -48,11 +54,10 @@ for epoch in range(nb_epochs):
     for data, target in train_loader:
         data, target = data.to(device), target.to(device)
 
-        adv = Adversary(data.shape, constraint, PGD, device=device, random_init=False)
+        adv = Adversary(data.shape, constraint, adv_opt_class, device=device, random_init=True)
         _, delta = adv.perturb(data, target, model, criterion, step_size,
                                iterations=inner_iter,
                                tol=1e-7)
-
         optimizer.zero_grad()
         adv_loss = criterion(model(data + delta), target)
         adv_loss.backward()
@@ -61,12 +66,52 @@ for epoch in range(nb_epochs):
         train_loss += adv_loss
     train_loss /= len(train_loader)
     print(f'epoch: {epoch}/{nb_epochs}, train loss: {train_loss:.3f}')
+    # TODO: get accuracy
 
     # Evaluate on clean and adversarial test data
-    
+
     model.eval()
+    # TODO evaluate on adversarial attacks from different optimizers
+    report = EasyDict(nb_test=0, correct=0, correct_adv_pgd=0,
+                      correct_adv_pgd_madry=0,
+                      correct_adv_fw=0, correct_adv_mfw=0)
     for data, target in test_loader:
         data, target = data.to(device), target.to(device)
+        adv_pgd = Adversary(data.shape, constraint, PGD, device=device, random_init=False)
+        adv_pgd_madry = Adversary(data.shape, constraint, PGDMadry, device=device, random_init=False)
+        adv_fw = Adversary(data.shape, constraint, FrankWolfe, device=device, random_init=False)
+        adv_mfw = Adversary(data.shape, constraint, MomentumFrankWolfe, device=device, random_init=False)
+        # Compute different perturbations
+        _, delta_pgd = adv_pgd.perturb(data, target, model, criterion, step_size_test,
+                               iterations=inner_iter_test,
+                               tol=1e-7)
+        _, delta_pgd_madry = adv_pgd_madry.perturb(data, target, model, criterion, step_size_test,
+                               iterations=inner_iter_test,
+                               tol=1e-7)
+        _, delta_fw = adv_fw.perturb(data, target, model, criterion, step_size_test,
+                               iterations=inner_iter_test,
+                               tol=1e-7)
+        _, delta_mfw = adv_mfw.perturb(data, target, model, criterion, step_size_test,
+                               iterations=inner_iter_test,
+                               tol=1e-7)
+        # Compute corresponding predictions        
+        _, pred = model(data).max(1)
+        _, adv_pred_pgd = model(data + delta_pgd).max(1)
+        _, adv_pred_pgd_madry = model(data + delta_pgd_madry).max(1)
+        _, adv_pred_fw = model(data + delta_fw).max(1)
+        _, adv_pred_mfw = model(data + delta_mfw).max(1)
 
-        
-        
+        # Get clean accuracies
+        report.nb_test += data.size(0)
+        report.correct += pred.eq(target).sum().item()
+        # Adversarial
+        report.correct_adv_pgd += adv_pred_pgd.eq(target).sum().item()
+        report.correct_adv_pgd_madry += adv_pred_pgd_madry.eq(target).sum().item()
+        report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
+        report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
+
+    print(f'test acc on clean examples (%): {report.correct / report.nb_test * 100.:.3f}')
+    print(f'test acc on adversarial examples PGD (%): {report.correct_adv_pgd / report.nb_test * 100.:.3f}')
+    print(f'test acc on adversarial examples PGD Madry(%): {report.correct_adv_pgd_madry / report.nb_test * 100.:.3f}')
+    print(f'test acc on adversarial examples FW (%): {report.correct_adv_fw / report.nb_test * 100.:.3f}')
+    print(f'test acc on adversarial examples MFW (%): {report.correct_adv_mfw / report.nb_test * 100.:.3f}')
