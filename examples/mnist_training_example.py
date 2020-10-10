@@ -73,7 +73,7 @@ for epoch in range(nb_epochs):
         adv_loss.backward()
         optimizer.step()
 
-        train_loss += adv_loss
+        train_loss += adv_loss.item()
     train_loss /= len(train_loader)
     print(f'Training loss: {train_loss:.3f}')
     # TODO: get accuracy

@@ -1,8 +1,12 @@
+import os
+
 from tqdm import tqdm
 
 import numpy as np
 import torch
 from torch import nn
+
+from torch.utils.tensorboard import SummaryWriter
 
 from easydict import EasyDict
 
@@ -35,26 +39,25 @@ nb_epochs = 50
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
-eps = 8. / 255 
+eps = 8. / 255  # From Madry's paper
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
-inner_iter = 7
+inner_iter = 4
 inner_iter_test = 20
 step_size = 2 * eps / inner_iter  # Step size recommended in Madry's paper
 # step_size = 1.25 * eps  # Step size used with random initialization
 step_size_test = 2 * eps / inner_iter_test
 random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
 
-# TODO: Actually log and plot stuff
-# Logging
-losses = []
-accuracies = []
-adv_losses = []
-adv_accuracies = []
 
 # adv_opt_class = PGD  # Seems like PGD doesn't work that well
-adv_opt_class = PGDMadry  # To beat
-# adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
+# adv_opt_class = PGDMadry  # To beat
+adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
 # adv_opt_class = MomentumFrankWolfe  # Same as FW: 2 steps works nicely
+
+
+# TODO: Actually log and plot stuff
+# Logging
+writer = SummaryWriter(os.path.join("logging/cifar10/", adv_opt_class.name))
 
 # Training loop
 for epoch in range(nb_epochs):
@@ -74,8 +77,9 @@ for epoch in range(nb_epochs):
         adv_loss.backward()
         optimizer.step()
 
-        train_loss += adv_loss
+        train_loss += adv_loss.item()
     train_loss /= len(train_loader)
+    writer.add_scalar("Loss/train", train_loss, epoch)
     print(f'Training loss: {train_loss:.3f}')
     # TODO: get accuracy
 
@@ -120,8 +124,15 @@ for epoch in range(nb_epochs):
         report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
         report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
 
-    print(f'Val acc on clean examples (%): {report.correct / report.nb_test * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD (%): {report.correct_adv_pgd / report.nb_test * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD Madry (%): {report.correct_adv_pgd_madry / report.nb_test * 100.:.3f}')
-    print(f'Val acc on adversarial examples FW (%): {report.correct_adv_fw / report.nb_test * 100.:.3f}')
-    print(f'Val acc on adversarial examples MFW (%): {report.correct_adv_mfw / report.nb_test * 100.:.3f}')
+    report.correct_adv_pgd /= report.nb_test
+    report.correct_adv_pgd_madry /= report.nb_test
+    report.correct_adv_fw /= report.nb_test
+    report.correct_adv_mfw /= report.nb_test
+
+    print(f'Val acc on clean examples (%): {report.correct * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD (%): {report.correct_adv_pgd * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD Madry (%): {report.correct_adv_pgd_madry * 100.:.3f}')
+    print(f'Val acc on adversarial examples FW (%): {report.correct_adv_fw * 100.:.3f}')
+    print(f'Val acc on adversarial examples MFW (%): {report.correct_adv_mfw * 100.:.3f}')
+    
+    writer.add_scalars("Test/Adv", report, epoch)
