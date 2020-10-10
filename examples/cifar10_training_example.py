@@ -35,7 +35,7 @@ nb_epochs = 50
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
-eps = 8.
+eps = 8. / 255 
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
 inner_iter = 7
 inner_iter_test = 20
