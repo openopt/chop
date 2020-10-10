@@ -49,7 +49,10 @@ accuracies = []
 adv_losses = []
 adv_accuracies = []
 
-adv_opt_class = PGD
+# adv_opt_class = PGD  # Seems like it doesn't work that well
+# adv_opt_class = PGDMadry  # SOTA-ish
+adv_opt_class = FrankWolfe
+# adv_opt_class = MomentumFrankWolfe
 
 # Training loop
 for epoch in range(nb_epochs):
@@ -118,6 +121,6 @@ for epoch in range(nb_epochs):
 
     print(f'Val acc on clean examples (%): {report.correct / report.nb_test * 100.:.3f}')
     print(f'Val acc on adversarial examples PGD (%): {report.correct_adv_pgd / report.nb_test * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD Madry(%): {report.correct_adv_pgd_madry / report.nb_test * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD Madry (%): {report.correct_adv_pgd_madry / report.nb_test * 100.:.3f}')
     print(f'Val acc on adversarial examples FW (%): {report.correct_adv_fw / report.nb_test * 100.:.3f}')
     print(f'Val acc on adversarial examples MFW (%): {report.correct_adv_mfw / report.nb_test * 100.:.3f}')
