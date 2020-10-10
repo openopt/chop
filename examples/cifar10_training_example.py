@@ -31,8 +31,8 @@ criterion = nn.CrossEntropyLoss()
 
 # TODO use SOTA schedulers etc...
 # Outer optimization parameters
-nb_epochs = 20
-optimizer = torch.optim.SGD(model.parameters(), lr=.1, momentum=.9)
+nb_epochs = 50
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
 eps = 8.
@@ -44,6 +44,7 @@ step_size = 2 * eps / inner_iter  # Step size recommended in Madry's paper
 step_size_test = 2 * eps / inner_iter_test
 random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
 
+# TODO: Actually log and plot stuff
 # Logging
 losses = []
 accuracies = []

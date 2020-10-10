@@ -43,6 +43,7 @@ step_size = 2 * eps / inner_iter  # Step size recommended in Madry's paper
 step_size_test = 2 * eps / inner_iter_test
 random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
 
+# TODO: Actually log and plot stuff
 # Logging
 losses = []
 accuracies = []
@@ -50,8 +51,8 @@ adv_losses = []
 adv_accuracies = []
 
 # adv_opt_class = PGD  # Seems like PGD doesn't work that well
-adv_opt_class = PGDMadry  # To beat
-# adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
+# adv_opt_class = PGDMadry  # To beat
+adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
 # adv_opt_class = MomentumFrankWolfe  # Same as FW: 2 steps works nicely
 
 # Training loop
