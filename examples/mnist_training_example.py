@@ -1,3 +1,5 @@
+from tqdm import tqdm
+
 import numpy as np
 import torch
 from torch import nn
@@ -28,16 +30,18 @@ model.to(device)
 criterion = nn.CrossEntropyLoss()
 
 # Outer optimization parameters
-nb_epochs = 10
+nb_epochs = 20
 optimizer = torch.optim.SGD(model.parameters(), lr=.1, momentum=.9)
 
 # Inner optimization parameters
 eps = 0.3
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
-inner_iter = 5
-inner_iter_test = 10
-step_size = 2 * eps / inner_iter
+inner_iter = 20
+inner_iter_test = 20
+# step_size = 2 * eps / inner_iter
+step_size = 1.25 * eps
 step_size_test = 2 * eps / inner_iter_test
+random_init = True  # Sample the starting optimization point uniformly at random in the constraint set
 
 # Logging
 losses = []
@@ -45,17 +49,19 @@ accuracies = []
 adv_losses = []
 adv_accuracies = []
 
-adv_opt_class = PGDMadry
+adv_opt_class = PGD
 
 # Training loop
 for epoch in range(nb_epochs):
     model.train()
     train_loss = 0.
-    for data, target in train_loader:
+    for data, target in tqdm(train_loader, desc=f'Training epoch {epoch}/{nb_epochs - 1}'):
         data, target = data.to(device), target.to(device)
 
-        adv = Adversary(data.shape, constraint, adv_opt_class, device=device, random_init=True)
-        _, delta = adv.perturb(data, target, model, criterion, step_size,
+        adv = Adversary(data.shape, constraint, adv_opt_class,
+                        device=device, random_init=random_init)
+        _, delta = adv.perturb(data, target, model, criterion,
+                               step_size,
                                iterations=inner_iter,
                                tol=1e-7)
         optimizer.zero_grad()
@@ -65,7 +71,7 @@ for epoch in range(nb_epochs):
 
         train_loss += adv_loss
     train_loss /= len(train_loader)
-    print(f'epoch: {epoch}/{nb_epochs}, train loss: {train_loss:.3f}')
+    print(f'epoch: {epoch}/{nb_epochs - 1}, train loss: {train_loss:.3f}')
     # TODO: get accuracy
 
     # Evaluate on clean and adversarial test data
@@ -75,7 +81,7 @@ for epoch in range(nb_epochs):
     report = EasyDict(nb_test=0, correct=0, correct_adv_pgd=0,
                       correct_adv_pgd_madry=0,
                       correct_adv_fw=0, correct_adv_mfw=0)
-    for data, target in test_loader:
+    for data, target in tqdm(test_loader, desc=f'Val epoch {epoch}/{nb_epochs - 1}'):
         data, target = data.to(device), target.to(device)
         adv_pgd = Adversary(data.shape, constraint, PGD, device=device, random_init=False)
         adv_pgd_madry = Adversary(data.shape, constraint, PGDMadry, device=device, random_init=False)
