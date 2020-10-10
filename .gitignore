@@ -165,3 +165,4 @@ dmypy.json
 
 logging/
 runs/
+**/plots/
