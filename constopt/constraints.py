@@ -113,7 +113,7 @@ class LpBall:
             distrib = Laplace(0, 1)
         x = distrib.sample(shape)
         e = expon(.5).rvs()
-        denom = (e + (x ** 2).sum()) ** .5
+        denom = torch.sqrt(e + (x ** 2).sum())
         return self.alpha * x / denom
 
 
@@ -151,9 +151,13 @@ class L1Ball(LpBall):
 
         return update_direction, 1.
 
-    def prox(self, x, step_size=None):
+    def prox(self, x, step_size=None, dim=None):
         shape = x.shape
-        x = euclidean_proj_l1ball(x.view(-1), self.alpha)
+        if dim == 0:
+            # TODO Vectorize using first dimension
+            x = euclidean_proj_l1ball(x.view(-1), self.alpha)
+        else:
+            x = euclidean_proj_l1ball(x.view(-1), self.alpha)
         return x.view(*shape)
 
 

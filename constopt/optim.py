@@ -6,10 +6,10 @@ from torch.optim import Optimizer
 https://github.com/openopt/copt"""
 class PGD(Optimizer):
     """Projected Gradient Descent"""
+    name = 'PGD'
 
     def __init__(self, params, constraint):
         self.prox = constraint.prox
-        self.name = 'PGD'
         defaults = dict(prox=self.prox, name=self.name)
         super(PGD, self).__init__(params, defaults)
 
@@ -39,11 +39,11 @@ class PGD(Optimizer):
 
 class PGDMadry(Optimizer):
     """What Madry et al. call PGD"""
+    name = 'PGD-Madry'
 
     def __init__(self, params, constraint):
         self.prox = constraint.prox
         self.lmo = constraint.lmo
-        self.name = 'PGD-Madry'
         defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
         super(PGDMadry, self).__init__(params, defaults)
 
@@ -75,17 +75,17 @@ class PGDMadry(Optimizer):
 
 class FrankWolfe(Optimizer):
     """Vanilla Frank-Wolfe algorithm"""
+    name = 'Vanilla-FW'
 
     def __init__(self, params, constraint):
         self.lmo = constraint.lmo
-        self.name = 'Vanilla-FW'
         defaults = dict(lmo=self.lmo, name=self.name)
         super(FrankWolfe, self).__init__(params, defaults)
 
     @torch.no_grad()
     def step(self, step_size=None, closure=None):
         """Performs a single optimization step
-        
+
         Arguments:
             step_size: Ignored by this optimizer
             closure (callable, optional): A closure that reevaluates the model
@@ -116,10 +116,10 @@ class FrankWolfe(Optimizer):
 
 class MomentumFrankWolfe(Optimizer):
     """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al"""
+    name = 'Momentum-FW'
 
     def __init__(self, params, constraint):
         self.lmo = constraint.lmo
-        self.name = 'Momentum-FW'
         defaults = dict(lmo=self.lmo, name=self.name)
         super(MomentumFrankWolfe, self).__init__(params, defaults)
 

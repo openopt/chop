@@ -49,7 +49,6 @@ def test_adversary_synthetic_data(algorithm, step_size, p):
     criterion = nn.CrossEntropyLoss()
     constraint = constopt.constraints.make_LpBall(alpha=1., p=p)
 
-    # adv = Adversary(data.shape, constraint, algorithm)
     adv = Adversary(data.shape, constraint, algorithm, device=device)
     optimizer = adv.optimizer
     # Logging
@@ -100,7 +99,7 @@ def test_adversary_mnist(algorithm, step_size, p, random_init, model_filename):
     criterion = nn.CrossEntropyLoss()
     constraint = constopt.constraints.make_LpBall(alpha=1., p=p)
 
-    test_loader = get_mnist_test_loader(batch_size=512, shuffle=True)
+    test_loader = get_mnist_test_loader(batch_size=1, shuffle=True)
     # Just get first batch
     for data, target in test_loader:
         break
@@ -134,5 +133,5 @@ def test_adversary_mnist(algorithm, step_size, p, random_init, model_filename):
     # loss = criterion(output, target)
     # Run and log perturbation
     adv_loss, delta = adv.perturb(data, target, model, criterion, step_size,
-                                  iterations=100,
+                                  iterations=20,
                                   tol=1e-7, store=store)
