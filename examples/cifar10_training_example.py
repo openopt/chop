@@ -6,13 +6,12 @@ from torch import nn
 
 from easydict import EasyDict
 
-from advertorch.test_utils import LeNet5
-from advertorch_examples.utils import get_mnist_train_loader
-from advertorch_examples.utils import get_mnist_test_loader
+from torchvision.models import resnet18
 
 import constopt
 from constopt.adversary import Adversary
 from constopt.optim import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
+from constopt.data_utils import ld_cifar10
 
 # Setup
 torch.manual_seed(0)
@@ -21,22 +20,24 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 # Data Loaders
-train_loader = get_mnist_train_loader(batch_size=128, shuffle=True)
-test_loader = get_mnist_test_loader(batch_size=512, shuffle=True)
+loader = ld_cifar10()
+train_loader = loader.train
+test_loader = loader.test
 
 # Model setup
-model = LeNet5()
+model = resnet18()
 model.to(device)
 criterion = nn.CrossEntropyLoss()
 
+# TODO use SOTA schedulers etc...
 # Outer optimization parameters
 nb_epochs = 20
 optimizer = torch.optim.SGD(model.parameters(), lr=.1, momentum=.9)
 
 # Inner optimization parameters
-eps = 0.3
+eps = 8.
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
-inner_iter = 40
+inner_iter = 7
 inner_iter_test = 20
 step_size = 2 * eps / inner_iter  # Step size recommended in Madry's paper
 # step_size = 1.25 * eps  # Step size used with random initialization

@@ -166,3 +166,4 @@ dmypy.json
 logging/
 runs/
 **/plots/
+**/madry_challenge/
