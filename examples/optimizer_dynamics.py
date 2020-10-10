@@ -18,9 +18,9 @@ def setup_problem(make_nonconvex=False):
     x_0 = torch.zeros_like(x_star)
 
     def loss_func(x):
-        val = ((x - x_star) ** 2).sum()
+        val = .5 * ((x - x_star) ** 2).sum()
         if make_nonconvex:
-            val *= torch.sin(abs(x))
+            val += .1 * torch.sin(100 * torch.norm(x, p=1) + .1)
         return val
 
     constraint = LinfBall(radius)
@@ -53,8 +53,8 @@ def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
 
 if __name__ == "__main__":
 
-    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=False)
-    iterations = 20
+    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=True)
+    iterations = 300
     losses_all = {}
     iterates_all = {}
     for opt_class in OPTIMIZER_CLASSES:
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
     for ax, opt_class in zip(axes.reshape(-1), OPTIMIZER_CLASSES):
-        ax.plot(*zip(*iterates_all[opt_class.name]), '-o', label=opt_class.name)
+        ax.plot(*zip(*iterates_all[opt_class.name]), '-o', label=opt_class.name, alpha=.6)
         ax.set_xlim(-1, 1)
         ax.set_ylim(-1, 1)
         ax.legend(loc='lower left')
