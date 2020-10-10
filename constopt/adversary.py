@@ -31,9 +31,8 @@ class Adversary:
 
             self.optimizer.zero_grad()
             output = model(data + self.delta)
-            loss = -criterion(output, target)
-            print(loss.item())
-            loss.backward()
+            adv_loss = -criterion(output, target)
+            adv_loss.backward()
 
             with torch.no_grad():
                 gap = self.constraint.fw_gap(self.delta.grad, self.delta)
@@ -56,10 +55,10 @@ class Adversary:
                 p = self.constraint.p
                 table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
                 store.log_table_and_tb(table_name,
-                                       {'func_val': -loss.item(),
+                                       {'func_val': -adv_loss.item(),
                                         'FW gap': gap.item(),
                                         'norm delta': norm(self.delta)
                                         })
                 store[table_name].flush_row()
 
-        return loss, self.delta
+        return adv_loss, self.delta
