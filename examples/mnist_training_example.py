@@ -19,7 +19,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 # Data Loaders
-train_loader = get_mnist_test_loader(batch_size=128, shuffle=True)
+train_loader = get_mnist_train_loader(batch_size=128, shuffle=True)
 test_loader = get_mnist_test_loader(batch_size=512, shuffle=True)
 
 # Model setup
@@ -34,7 +34,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr=.1, momentum=.9)
 # Inner optimization parameters
 eps = 0.3
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
-inner_iter = 3
+inner_iter = 5
 inner_iter_test = 10
 step_size = 2 * eps / inner_iter
 step_size_test = 2 * eps / inner_iter_test
