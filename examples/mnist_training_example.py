@@ -71,7 +71,7 @@ for epoch in range(nb_epochs):
 
         train_loss += adv_loss
     train_loss /= len(train_loader)
-    print(f'epoch: {epoch}/{nb_epochs - 1}, train loss: {train_loss:.3f}')
+    print(f'Training loss: {train_loss:.3f}')
     # TODO: get accuracy
 
     # Evaluate on clean and adversarial test data
@@ -116,8 +116,8 @@ for epoch in range(nb_epochs):
         report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
         report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
 
-    print(f'test acc on clean examples (%): {report.correct / report.nb_test * 100.:.3f}')
-    print(f'test acc on adversarial examples PGD (%): {report.correct_adv_pgd / report.nb_test * 100.:.3f}')
-    print(f'test acc on adversarial examples PGD Madry(%): {report.correct_adv_pgd_madry / report.nb_test * 100.:.3f}')
-    print(f'test acc on adversarial examples FW (%): {report.correct_adv_fw / report.nb_test * 100.:.3f}')
-    print(f'test acc on adversarial examples MFW (%): {report.correct_adv_mfw / report.nb_test * 100.:.3f}')
+    print(f'Val acc on clean examples (%): {report.correct / report.nb_test * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD (%): {report.correct_adv_pgd / report.nb_test * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD Madry(%): {report.correct_adv_pgd_madry / report.nb_test * 100.:.3f}')
+    print(f'Val acc on adversarial examples FW (%): {report.correct_adv_fw / report.nb_test * 100.:.3f}')
+    print(f'Val acc on adversarial examples MFW (%): {report.correct_adv_mfw / report.nb_test * 100.:.3f}')
