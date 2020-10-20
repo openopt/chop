@@ -117,7 +117,7 @@ class FrankWolfe(Optimizer):
                     step_size = 2. / (state['step'] + 2)
 
                 update_direction, _ = self.lmo(-p.grad, p)
-                p += 2. / (state['step'] + 2) * update_direction
+                p += step_size * update_direction
         return loss
 
 
@@ -157,14 +157,15 @@ class MomentumFrankWolfe(Optimizer):
                     state['grad_estimate'] = torch.zeros_like(
                         p, memory_format=torch.preserve_format)
 
+                if step_size is None:
+                    step_size = 1. / (state['step'] + 1.)
+                if momentum is None:
+                    rho = (1. / (state['step'] + 1)) ** (1/3)
+                    momentum = 1. - rho
+
                 state['step'] += 1.
 
-                if step_size is None:
-                    step_size = 1. / (state['step'] + 1)
-                if momentum is None:
-                    momentum = 1. - (1. / (state['step'] + 1)) ** (1/3)
-
-                state['grad_estimate'] += (1. / (state['step'] + 1)) ** (1/3) * (grad - state['grad_estimate'])
+                state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
-                p += 1. / (state['step'] + 1) * update_direction
+                p += step_size * update_direction
         return loss

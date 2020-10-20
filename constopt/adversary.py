@@ -23,8 +23,6 @@ class Adversary:
         was_training = model.training
         model.eval()
         ii = 0
-        if "FW" in self.optimizer.name:
-            step_size = 0.
 
         gap = torch.tensor(np.inf)
         while gap.item() > tol:

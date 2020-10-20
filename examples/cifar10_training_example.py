@@ -97,7 +97,7 @@ for epoch in range(nb_epochs):
         adv_fw = Adversary(data.shape, constraint, FrankWolfe, device=device, random_init=False)
         adv_mfw = Adversary(data.shape, constraint, MomentumFrankWolfe, device=device, random_init=False)
         # Compute different perturbations
-        _, delta_pgd = adv_pgd.perturb(data, target, model, criterion, step_size_test * 1e4,
+        _, delta_pgd = adv_pgd.perturb(data, target, model, criterion, step_size_test * 5e4,
                                iterations=inner_iter_test,
                                tol=1e-7)
         _, delta_pgd_madry = adv_pgd_madry.perturb(data, target, model, criterion, step_size_test,
@@ -125,6 +125,7 @@ for epoch in range(nb_epochs):
         report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
         report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
 
+    report.correct /= report.nb_test
     report.correct_adv_pgd /= report.nb_test
     report.correct_adv_pgd_madry /= report.nb_test
     report.correct_adv_fw /= report.nb_test
