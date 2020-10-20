@@ -27,12 +27,14 @@ class PGD(Optimizer):
                 if grad.is_sparse:
                     raise RuntimeError(
                         'We do not yet support sparse gradients.')
-                if not step_size:
-                    state = self.state[p]
-                    if len(state) == 0:
-                        state['step'] = 0.
-                    state['step'] += 1.
+                state = self.state[p]
+                if len(state) == 0:
+                    state['step'] = 0.
+                state['step'] += 1.
+
+                if step_size is None:
                     step_size = 1. / (state['step'] + 1.)
+
                 p.add_(self.prox(p - step_size * grad) - p)
         return loss
 
