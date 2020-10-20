@@ -39,26 +39,28 @@ nb_epochs = 50
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
-# eps = 8. / 255  # From Madry's paper
-eps = 1.
+eps = 8. / 255  # From Madry's paper
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
+
 inner_iter = 7  # Madry uses 7 steps for training
 inner_iter_test = 7
+
 step_size = 2. * eps / inner_iter  # Step size recommended in Madry's paper
-# step_size = 1.25 * eps  # Step size used with random initialization
 step_size_test = 2. * eps / inner_iter_test
+
 random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
+# step_size = 1.25 * eps  # Step size used with random initialization
 
 
-# adv_opt_class = PGD  # Seems like PGD doesn't work that well
+# adv_opt_class = PGD  # Use a bigger step size than for PGDMadry
+# step_size *= 1e4
 adv_opt_class = PGDMadry  # To beat
 # adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
 # adv_opt_class = MomentumFrankWolfe  # Same as FW: 2 steps works nicely
-# adv_opt_class = None  # Clean training
+# adv_opt_class = None
 
-# TODO: Actually log and plot stuff
 # Logging
-writer = SummaryWriter(os.path.join("logging/cifar10/", adv_opt_class.name))
+writer = SummaryWriter(os.path.join("logging/cifar10/", adv_opt_class.name if adv_opt_class else "Clean"))
 
 # Training loop
 for epoch in range(nb_epochs):
@@ -67,7 +69,7 @@ for epoch in range(nb_epochs):
     for data, target in tqdm(train_loader, desc=f'Training epoch {epoch}/{nb_epochs - 1}'):
         data, target = data.to(device), target.to(device)
 
-        adv = Adversary(data.shape, constraint, None,
+        adv = Adversary(data.shape, constraint, adv_opt_class,
                         device=device, random_init=random_init)
         _, delta = adv.perturb(data, target, model, criterion,
                                step_size,
