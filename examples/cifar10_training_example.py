@@ -39,7 +39,8 @@ nb_epochs = 50
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
-eps = 8. / 255  # From Madry's paper
+# eps = 8. / 255  # From Madry's paper
+eps = 1.
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
 inner_iter = 4
 inner_iter_test = 20
@@ -124,6 +125,7 @@ for epoch in range(nb_epochs):
         report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
         report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
 
+    report.correct /= report.nb_test
     report.correct_adv_pgd /= report.nb_test
     report.correct_adv_pgd_madry /= report.nb_test
     report.correct_adv_fw /= report.nb_test
