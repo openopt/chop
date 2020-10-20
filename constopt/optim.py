@@ -48,7 +48,7 @@ class PGDMadry(Optimizer):
         super(PGDMadry, self).__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, step_size, closure=None):
+    def step(self, step_size=None, closure=None):
         loss = None
         if closure is not None:
             with torch.enable_grad():
@@ -73,6 +73,8 @@ class PGDMadry(Optimizer):
         return loss
 
 
+# TODO: Try rescaling the update_direction as alpha * \|gradient\|
+# + Demyanov Rubinov step-size
 class FrankWolfe(Optimizer):
     """Vanilla Frank-Wolfe algorithm"""
     name = 'Vanilla-FW'
@@ -109,13 +111,17 @@ class FrankWolfe(Optimizer):
 
                 state['step'] += 1.
 
+                if step_size is None:
+                    step_size = 1. / (state['step'] + 1)
+
                 update_direction, _ = self.lmo(-p.grad, p)
                 p += (2. / (state['step'] + 2.)) * update_direction
         return loss
 
 
 class MomentumFrankWolfe(Optimizer):
-    """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al"""
+    """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al.
+    This is essentially FrankWolfe with Momentum."""
     name = 'Momentum-FW'
 
     def __init__(self, params, constraint):
@@ -125,7 +131,7 @@ class MomentumFrankWolfe(Optimizer):
 
 
     @torch.no_grad()
-    def step(self, step_size=None, closure=None):
+    def step(self, step_size=None, momentum=None, closure=None):
         """Performs a single optimization step.
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
@@ -150,8 +156,13 @@ class MomentumFrankWolfe(Optimizer):
                         p, memory_format=torch.preserve_format)
 
                 state['step'] += 1.
-                state['grad_estimate'] += ((1. / (state['step'] + 1)) ** (1/3)
-                                           * (grad - state['grad_estimate']))
+
+                if step_size is None:
+                    step_size = 1. / (state['step'] + 1)
+                if momentum is None:
+                    momentum = (1. / (state['step'] + 1)) ** (1/3)
+
+                state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
-                p += (1. / (state['step'] + 1)) * update_direction
+                p += step_size * update_direction
         return loss

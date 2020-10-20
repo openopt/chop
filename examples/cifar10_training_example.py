@@ -42,17 +42,17 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 # eps = 8. / 255  # From Madry's paper
 eps = 1.
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
-inner_iter = 4
-inner_iter_test = 20
-step_size = 2 * eps / inner_iter  # Step size recommended in Madry's paper
+inner_iter = 7  # Madry uses 7 steps for training
+inner_iter_test = 7
+step_size = 2. * eps / inner_iter  # Step size recommended in Madry's paper
 # step_size = 1.25 * eps  # Step size used with random initialization
-step_size_test = 2 * eps / inner_iter_test
+step_size_test = 2. * eps / inner_iter_test
 random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
 
 
 # adv_opt_class = PGD  # Seems like PGD doesn't work that well
-# adv_opt_class = PGDMadry  # To beat
-adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
+adv_opt_class = PGDMadry  # To beat
+# adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
 # adv_opt_class = MomentumFrankWolfe  # Same as FW: 2 steps works nicely
 
 
@@ -136,5 +136,5 @@ for epoch in range(nb_epochs):
     print(f'Val acc on adversarial examples PGD Madry (%): {report.correct_adv_pgd_madry * 100.:.3f}')
     print(f'Val acc on adversarial examples FW (%): {report.correct_adv_fw * 100.:.3f}')
     print(f'Val acc on adversarial examples MFW (%): {report.correct_adv_mfw * 100.:.3f}')
-    
+
     writer.add_scalars("Test/Adv", report, epoch)
