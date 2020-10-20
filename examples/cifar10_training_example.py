@@ -40,6 +40,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
 eps = 8. / 255  # From Madry's paper
+eps = 1.
 constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
 inner_iter = 7  # Madry uses 7 steps for training
 inner_iter_test = 7
@@ -53,7 +54,7 @@ random_init = False  # Sample the starting optimization point uniformly at rando
 adv_opt_class = PGDMadry  # To beat
 # adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
 # adv_opt_class = MomentumFrankWolfe  # Same as FW: 2 steps works nicely
-
+# adv_opt_class = None  # Clean training
 
 # TODO: Actually log and plot stuff
 # Logging
@@ -66,7 +67,7 @@ for epoch in range(nb_epochs):
     for data, target in tqdm(train_loader, desc=f'Training epoch {epoch}/{nb_epochs - 1}'):
         data, target = data.to(device), target.to(device)
 
-        adv = Adversary(data.shape, constraint, adv_opt_class,
+        adv = Adversary(data.shape, constraint, None,
                         device=device, random_init=random_init)
         _, delta = adv.perturb(data, target, model, criterion,
                                step_size,
@@ -102,10 +103,10 @@ for epoch in range(nb_epochs):
         _, delta_pgd_madry = adv_pgd_madry.perturb(data, target, model, criterion, step_size_test,
                                iterations=inner_iter_test,
                                tol=1e-7)
-        _, delta_fw = adv_fw.perturb(data, target, model, criterion, step_size_test,
+        _, delta_fw = adv_fw.perturb(data, target, model, criterion, step_size=None,
                                iterations=inner_iter_test,
                                tol=1e-7)
-        _, delta_mfw = adv_mfw.perturb(data, target, model, criterion, step_size_test,
+        _, delta_mfw = adv_mfw.perturb(data, target, model, criterion, step_size=None,
                                iterations=inner_iter_test,
                                tol=1e-7)
         # Compute corresponding predictions        
@@ -124,6 +125,7 @@ for epoch in range(nb_epochs):
         report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
         report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
 
+    report.correct /= report.nb_test
     report.correct_adv_pgd /= report.nb_test
     report.correct_adv_pgd_madry /= report.nb_test
     report.correct_adv_fw /= report.nb_test
