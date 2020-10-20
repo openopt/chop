@@ -32,7 +32,7 @@ criterion = nn.CrossEntropyLoss()
 # Outer optimization parameters
 nb_epochs = 20
 step_size = .1
-momentum = .1
+momentum = .9
 
 # TODO: tune hyperparams for algorithms, and constraint sets
 # Choose optimizer here
@@ -62,7 +62,7 @@ for epoch in range(nb_epochs):
         optimizer.zero_grad()
         loss = criterion(model(data), target)
         loss.backward()
-        optimizer.step()
+        optimizer.step(step_size=step_size, momentum=momentum)
 
         train_loss += loss.item()
     train_loss /= len(train_loader)
