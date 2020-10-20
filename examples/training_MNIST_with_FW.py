@@ -31,6 +31,8 @@ criterion = nn.CrossEntropyLoss()
 
 # Outer optimization parameters
 nb_epochs = 20
+step_size = .1
+momentum = .1
 
 # TODO: tune hyperparams for algorithms, and constraint sets
 # Choose optimizer here

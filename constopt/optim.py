@@ -162,7 +162,7 @@ class MomentumFrankWolfe(Optimizer):
                 if momentum is None:
                     momentum = (1. / (state['step'] + 1)) ** (1/3)
 
-                state['grad_estimate'] += momentum * (grad - state['grad_estimate'])
+                state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
                 p += step_size * update_direction
         return loss
