@@ -15,7 +15,7 @@ class Adversary:
         self.constraint = constraint
 
     def perturb(self, data, target, model, criterion,
-                step_size, tol=1e-6, iterations=None,
+                step_size=None, tol=1e-6, iterations=None,
                 store=None):
 
         if self.optimizer is None:

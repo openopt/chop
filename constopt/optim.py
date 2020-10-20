@@ -63,12 +63,15 @@ class PGDMadry(Optimizer):
                 if grad.is_sparse:
                     raise RuntimeError(
                         'We do not yet support sparse gradients.')
+                # Keep track of the step
+                state = self.state[p]
+                if len(state) == 0:
+                    state['step'] = 0.
+                state['step'] += 1.
+
                 if not step_size:
-                    state = self.state[p]
-                    if len(state) == 0:
-                        state['step'] = 0.
-                    state['step'] += 1.
                     step_size = 1. / (state['step'] + 1.)
+
                 lmo_res, _ = self.lmo(-p.grad, p)
                 normalized_grad = lmo_res + p
                 p.add_(self.prox(p + step_size * normalized_grad) - p)
