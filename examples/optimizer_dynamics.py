@@ -11,7 +11,6 @@ torch.random.manual_seed(0)
 OPTIMIZER_CLASSES = [PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe]
 
 
-# TODO: make non-convex loss
 def setup_problem(make_nonconvex=False):
     radius = 1.
     x_star = torch.tensor([radius, radius/2])
@@ -20,7 +19,7 @@ def setup_problem(make_nonconvex=False):
     def loss_func(x):
         val = .5 * ((x - x_star) ** 2).sum()
         if make_nonconvex:
-            val += .1 * torch.sin(100 * torch.norm(x, p=1) + .1)
+            val += .1 * torch.sin(50 * torch.norm(x, p=1) + .1)
         return val
 
     constraint = LinfBall(radius)
@@ -35,14 +34,18 @@ def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
     iterates = [x.data.numpy().copy()]
     losses = []
     # Use Madry's heuristic for step size
-    # Note this is only used in PGD and PGDMadry
-    step_size = 2. * constraint.alpha / iterations
+    step_size = {
+        FrankWolfe.name: None,
+        MomentumFrankWolfe.name: None,
+        PGD.name: 2.5 * constraint.alpha / iterations * 2.,
+        PGDMadry.name: 2.5 * constraint.alpha / iterations
+    }
 
     for _ in range(iterations):
         optimizer.zero_grad()
         loss = loss_func(x)
         loss.backward()
-        optimizer.step(step_size)
+        optimizer.step(step_size[optimizer.name])
         losses.append(loss.item())
         iterates.append(x.data.numpy().copy())
 
@@ -53,8 +56,8 @@ def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
 
 if __name__ == "__main__":
 
-    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=True)
-    iterations = 300
+    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=False)
+    iterations = 10
     losses_all = {}
     iterates_all = {}
     for opt_class in OPTIMIZER_CLASSES:

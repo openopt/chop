@@ -16,6 +16,7 @@ class Adversary:
 
     def perturb(self, data, target, model, criterion,
                 step_size=None, tol=1e-6, iterations=None,
+                use_best=False,
                 store=None):
 
         if self.optimizer is None:
@@ -25,6 +26,7 @@ class Adversary:
         ii = 0
 
         gap = torch.tensor(np.inf)
+        best_loss = -torch.tensor(np.inf)
         while gap.item() > tol:
             if ii == iterations:
                 break
@@ -32,6 +34,9 @@ class Adversary:
             self.optimizer.zero_grad()
             output = model(data + self.delta)
             adv_loss = -criterion(output, target)
+            if -adv_loss.item() > best_loss.item():
+                best_loss = -adv_loss.clone().detach()
+                best_delta = self.delta.clone().detach()
             adv_loss.backward()
 
             with torch.no_grad():
@@ -64,4 +69,7 @@ class Adversary:
         if was_training:
             model.train()
 
-        return adv_loss, self.delta
+        if use_best:
+            return -best_loss, best_delta
+
+        return -adv_loss, self.delta

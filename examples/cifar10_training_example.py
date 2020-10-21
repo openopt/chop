@@ -40,33 +40,28 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Inner optimization parameters
 eps = 8. / 255  # From Madry's paper
-constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)
+# eps = 16. / 255
+constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)  # also used for testing
 
 inner_iter = 7  # Madry uses 7 steps for training
-inner_iter_test = 7
-
-# step_size = 2. * eps / inner_iter  # Step size recommended in Madry's paper
-step_size = 2. / 255
-# step_size_test = 2. * eps / inner_iter_test
-step_size_test = 2. / 255
+inner_iter_test = 20  # They use 20 steps for testing
 
 random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
-# step_size = 1.25 * eps  # Step size used with random initialization
-
 
 # adv_opt_class = PGD  # Use a bigger step size than for PGDMadry
-# step_size *= 1e4
-adv_opt_class = PGDMadry  # To beat
-# adv_opt_class = FrankWolfe  # Seems good with few steps, ie 2. Using 10 steps breaks the model.
-# adv_opt_class = MomentumFrankWolfe  # Same as FW: 2 steps works nicely
+# adv_opt_class = PGDMadry  # To beat
+adv_opt_class = FrankWolfe
+# adv_opt_class = MomentumFrankWolfe
 # adv_opt_class = None
 
 step_size = {
     FrankWolfe.name: None,
     MomentumFrankWolfe.name: None,
-    PGD.name: 2. / 255 * 1e4,
-    PGDMadry.name: 2. / 255
+    PGD.name: 2.5 * constraint.alpha / inner_iter * 1e4,
+    PGDMadry.name: 2.5 * constraint.alpha / inner_iter  # from Madry's paper
 }
+
+step_size_test = 2.5 * constraint.alpha / inner_iter_test  # from Madry et al. robustness library
 
 # Logging
 writer = SummaryWriter(os.path.join("logging/cifar10/", adv_opt_class.name if adv_opt_class else "Clean"))
@@ -83,6 +78,7 @@ for epoch in range(nb_epochs):
         _, delta = adv.perturb(data, target, model, criterion,
                                step_size[adv_opt_class.name] if adv_opt_class else None,
                                iterations=inner_iter,
+                               use_best=True,
                                tol=1e-7)
         optimizer.zero_grad()
         adv_loss = criterion(model(data + delta), target)
@@ -110,15 +106,19 @@ for epoch in range(nb_epochs):
         # Compute different perturbations
         _, delta_pgd = adv_pgd.perturb(data, target, model, criterion, step_size_test * 5e4,
                                iterations=inner_iter_test,
+                               use_best=True,
                                tol=1e-7)
         _, delta_pgd_madry = adv_pgd_madry.perturb(data, target, model, criterion, step_size_test,
                                iterations=inner_iter_test,
+                               use_best=True,
                                tol=1e-7)
         _, delta_fw = adv_fw.perturb(data, target, model, criterion, step_size=None,
                                iterations=inner_iter_test,
+                               use_best=True,
                                tol=1e-7)
         _, delta_mfw = adv_mfw.perturb(data, target, model, criterion, step_size=None,
                                iterations=inner_iter_test,
+                               use_best=True,
                                tol=1e-7)
         # Compute corresponding predictions
         _, pred = model(data).max(1)
