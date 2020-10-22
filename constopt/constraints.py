@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import torch
 
 import numpy as np
@@ -115,6 +117,24 @@ class LpBall:
         e = expon(.5).rvs()
         denom = torch.sqrt(e + (x ** 2).sum())
         return self.alpha * x / denom
+
+    def __mul__(self, other):
+        """Scales the constraint by a scalar"""
+        ret = deepcopy(self)
+        ret.alpha *= other
+        return ret
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __imul__(self, other):
+        self.alpha *= other
+        return self
+
+    def __truediv__(self, other):
+        ret = deepcopy(self)
+        ret.alpha /= other
+        return ret
 
 
 class LinfBall(LpBall):

@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass, asdict
 
 from tqdm import tqdm
 
@@ -7,8 +8,6 @@ import torch
 from torch import nn
 
 from torch.utils.tensorboard import SummaryWriter
-
-from easydict import EasyDict
 
 from torchvision.models import resnet18
 
@@ -64,6 +63,23 @@ step_size = {
 step_size_test = 2.5 * constraint.alpha / inner_iter_test  # from Madry et al. robustness library
 
 # Logging
+@dataclass
+class Report:
+    """Keeps track of accuracies for different attackers"""
+    nb_test: int = 0
+    correct: int = 0.
+    correct_adv_pgd: int = 0
+    correct_adv_pgd_madry: int = 0
+    correct_adv_fw: int = 0
+    correct_adv_mfw: int = 0
+
+    def accuracies(self):
+        return (x / self.nb_test
+                for x in (self.correct,
+                          self.correct_adv_pgd, self.correct_adv_pgd_madry,
+                          self.correct_adv_fw, self.correct_adv_mfw))
+
+
 writer = SummaryWriter(os.path.join("logging/cifar10/", adv_opt_class.name if adv_opt_class else "Clean"))
 
 # Training loop
@@ -94,9 +110,7 @@ for epoch in range(nb_epochs):
     # Evaluate on clean and adversarial test data
 
     model.eval()
-    report = EasyDict(nb_test=0, correct=0, correct_adv_pgd=0,
-                      correct_adv_pgd_madry=0,
-                      correct_adv_fw=0, correct_adv_mfw=0)
+    report = Report()
     for data, target in tqdm(test_loader, desc=f'Val epoch {epoch}/{nb_epochs - 1}'):
         data, target = data.to(device), target.to(device)
         adv_pgd = Adversary(data.shape, constraint, PGD, device=device, random_init=False)
@@ -136,16 +150,13 @@ for epoch in range(nb_epochs):
         report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
         report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
 
-    report.correct /= report.nb_test
-    report.correct_adv_pgd /= report.nb_test
-    report.correct_adv_pgd_madry /= report.nb_test
-    report.correct_adv_fw /= report.nb_test
-    report.correct_adv_mfw /= report.nb_test
+    (accuracy, accuracy_adv_pgd, accuracy_adv_pgd_madry,
+     accuracy_adv_fw, accuracy_adv_mfw) = report.accuracies()
 
-    print(f'Val acc on clean examples (%): {report.correct * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD (%): {report.correct_adv_pgd * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD Madry (%): {report.correct_adv_pgd_madry * 100.:.3f}')
-    print(f'Val acc on adversarial examples FW (%): {report.correct_adv_fw * 100.:.3f}')
-    print(f'Val acc on adversarial examples MFW (%): {report.correct_adv_mfw * 100.:.3f}')
+    print(f'Val acc on clean examples (%): {accuracy * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD (%): {accuracy_adv_pgd * 100.:.3f}')
+    print(f'Val acc on adversarial examples PGD Madry (%): {accuracy_adv_pgd_madry * 100.:.3f}')
+    print(f'Val acc on adversarial examples FW (%): {accuracy_adv_fw * 100.:.3f}')
+    print(f'Val acc on adversarial examples MFW (%): {accuracy_adv_mfw * 100.:.3f}')
 
-    writer.add_scalars("Test/Adv", report, epoch)
+    writer.add_scalars("Test/Adv", asdict(report), epoch)
