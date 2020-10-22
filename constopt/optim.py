@@ -45,9 +45,7 @@ class PGDMadry(Optimizer):
 
     def __init__(self, params, constraint):
         self.prox = constraint.prox
-        # Ensure that constraint.alpha == 1 for the LMO
-        constraint_normalized = constraint / constraint.alpha
-        self.lmo = constraint_normalized.lmo
+        self.lmo = constraint.lmo
         defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
         super(PGDMadry, self).__init__(params, defaults)
 
