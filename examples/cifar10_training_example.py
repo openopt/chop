@@ -1,5 +1,7 @@
 import os
-from dataclasses import dataclass, asdict
+from argparse import ArgumentParser
+
+from easydict import EasyDict
 
 from tqdm import tqdm
 
@@ -16,147 +18,167 @@ from constopt.adversary import Adversary
 from constopt.optim import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
 from constopt.data_utils import ld_cifar10
 
-# Setup
-torch.manual_seed(0)
 
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
-
-# Data Loaders
-loader = ld_cifar10()
-train_loader = loader.train
-test_loader = loader.test
-
-# Model setup
-model = resnet18()
-model.to(device)
-criterion = nn.CrossEntropyLoss()
-
-# TODO use SOTA schedulers etc...
-# Outer optimization parameters
-nb_epochs = 50
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-# Inner optimization parameters
-eps = 8. / 255  # From Madry's paper
-# eps = 16. / 255
-constraint = constopt.constraints.make_LpBall(alpha=eps, p=np.inf)  # also used for testing
-
-inner_iter = 7  # Madry uses 7 steps for training
-inner_iter_test = 20  # They use 20 steps for testing
-
-random_init = False  # Sample the starting optimization point uniformly at random in the constraint set
-
-# adv_opt_class = PGD  # Use a bigger step size than for PGDMadry
-# adv_opt_class = PGDMadry  # To beat
-adv_opt_class = FrankWolfe
-# adv_opt_class = MomentumFrankWolfe
-# adv_opt_class = None
-
-step_size = {
-    FrankWolfe.name: None,
-    MomentumFrankWolfe.name: None,
-    PGD.name: 2.5 * constraint.alpha / inner_iter * 1e4,
-    PGDMadry.name: 2.5 * constraint.alpha / inner_iter  # from Madry's paper
-}
-
-step_size_test = 2.5 * constraint.alpha / inner_iter_test  # from Madry et al. robustness library
-
-# Logging
-@dataclass
-class Report:
-    """Keeps track of accuracies for different attackers"""
-    nb_test: int = 0
-    correct: int = 0.
-    correct_adv_pgd: int = 0
-    correct_adv_pgd_madry: int = 0
-    correct_adv_fw: int = 0
-    correct_adv_mfw: int = 0
-
-    def accuracies(self):
-        return (x / self.nb_test
-                for x in (self.correct,
-                          self.correct_adv_pgd, self.correct_adv_pgd_madry,
-                          self.correct_adv_fw, self.correct_adv_mfw))
+parser = ArgumentParser()
+parser.add_argument("--inner-alg", type=str, default="pgd-madry", help="pgd | pgd-madry | fw | mfw | none")
+parser.add_argument("--inner-iter", type=int, default=7)
+parser.add_argument("--inner-iter-test", type=int, default=20)
+parser.add_argument("--eps", type=float, default=8./255)
+# parser.add_argument("--eps-test", type=float, default=None)
+parser.add_argument("--model", type=str, default="resnet18")
+parser.add_argument("--inner-step-size", type=float)
+parser.add_argument("--random_init", action="store_true")
+parser.add_argument("--nb-epochs", default=50)
+parser.add_argument("--p", default='inf', help="2 | inf")
 
 
-writer = SummaryWriter(os.path.join("logging/cifar10/", adv_opt_class.name if adv_opt_class else "Clean"))
+def main(args):
+    # Setup
+    torch.manual_seed(0)
 
-# Training loop
-for epoch in range(nb_epochs):
-    model.train()
-    train_loss = 0.
-    for data, target in tqdm(train_loader, desc=f'Training epoch {epoch}/{nb_epochs - 1}'):
-        data, target = data.to(device), target.to(device)
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda" if use_cuda else "cpu")
 
-        adv = Adversary(data.shape, constraint, adv_opt_class,
-                        device=device, random_init=random_init)
-        _, delta = adv.perturb(data, target, model, criterion,
-                               step_size[adv_opt_class.name] if adv_opt_class else None,
-                               iterations=inner_iter,
-                               use_best=True,
-                               tol=1e-7)
-        optimizer.zero_grad()
-        adv_loss = criterion(model(data + delta), target)
-        adv_loss.backward()
-        optimizer.step()
+    # Data Loaders
+    loader = ld_cifar10()
+    train_loader = loader.train
+    test_loader = loader.test
 
-        train_loss += adv_loss.item()
-    train_loss /= len(train_loader)
-    writer.add_scalar("Loss/train", train_loss, epoch)
-    print(f'Training loss: {train_loss:.3f}')
-    # TODO: get accuracy
+    # Model setup
+    if args.model == "resnet18":
+        model = resnet18()
+    else:
+        raise ValueError("Must use resnet18 for now.")
+    model.to(device)
 
-    # Evaluate on clean and adversarial test data
+    criterion = nn.CrossEntropyLoss()
 
-    model.eval()
-    report = Report()
-    for data, target in tqdm(test_loader, desc=f'Val epoch {epoch}/{nb_epochs - 1}'):
-        data, target = data.to(device), target.to(device)
-        adv_pgd = Adversary(data.shape, constraint, PGD, device=device, random_init=False)
-        adv_pgd_madry = Adversary(data.shape, constraint, PGDMadry, device=device, random_init=False)
-        adv_fw = Adversary(data.shape, constraint, FrankWolfe, device=device, random_init=False)
-        adv_mfw = Adversary(data.shape, constraint, MomentumFrankWolfe, device=device, random_init=False)
-        # Compute different perturbations
-        _, delta_pgd = adv_pgd.perturb(data, target, model, criterion, step_size_test * 5e4,
-                               iterations=inner_iter_test,
-                               use_best=True,
-                               tol=1e-7)
-        _, delta_pgd_madry = adv_pgd_madry.perturb(data, target, model, criterion, step_size_test,
-                               iterations=inner_iter_test,
-                               use_best=True,
-                               tol=1e-7)
-        _, delta_fw = adv_fw.perturb(data, target, model, criterion, step_size=None,
-                               iterations=inner_iter_test,
-                               use_best=True,
-                               tol=1e-7)
-        _, delta_mfw = adv_mfw.perturb(data, target, model, criterion, step_size=None,
-                               iterations=inner_iter_test,
-                               use_best=True,
-                               tol=1e-7)
-        # Compute corresponding predictions
-        _, pred = model(data).max(1)
-        _, adv_pred_pgd = model(data + delta_pgd).max(1)
-        _, adv_pred_pgd_madry = model(data + delta_pgd_madry).max(1)
-        _, adv_pred_fw = model(data + delta_fw).max(1)
-        _, adv_pred_mfw = model(data + delta_mfw).max(1)
+    # TODO use SOTA schedulers etc...
+    # Outer optimization parameters
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-        # Get clean accuracies
-        report.nb_test += data.size(0)
-        report.correct += pred.eq(target).sum().item()
-        # Adversarial
-        report.correct_adv_pgd += adv_pred_pgd.eq(target).sum().item()
-        report.correct_adv_pgd_madry += adv_pred_pgd_madry.eq(target).sum().item()
-        report.correct_adv_fw += adv_pred_fw.eq(target).sum().item()
-        report.correct_adv_mfw += adv_pred_mfw.eq(target).sum().item()
+    # Inner optimization parameters
+    p = np.inf if args.p == "inf" else int(args.p)
+    constraint = constopt.constraints.make_LpBall(alpha=args.eps, p=p)  # also used for testing
 
-    (accuracy, accuracy_adv_pgd, accuracy_adv_pgd_madry,
-     accuracy_adv_fw, accuracy_adv_mfw) = report.accuracies()
+    random_init = args.random_init  # Sample the starting optimization point uniformly at random in the constraint set
 
-    print(f'Val acc on clean examples (%): {accuracy * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD (%): {accuracy_adv_pgd * 100.:.3f}')
-    print(f'Val acc on adversarial examples PGD Madry (%): {accuracy_adv_pgd_madry * 100.:.3f}')
-    print(f'Val acc on adversarial examples FW (%): {accuracy_adv_fw * 100.:.3f}')
-    print(f'Val acc on adversarial examples MFW (%): {accuracy_adv_mfw * 100.:.3f}')
+    if args.inner_alg == "pgd":
+        adv_opt_class = PGD  # Use a bigger step size than for PGDMadry
+        if not args.inner_step_size:
+            inner_step_size = 5e4 * 2.5 * args.eps / args.inner_iter
+    elif args.inner_alg == "pgd-madry":
+        adv_opt_class = PGDMadry  # To beat
+        if not args.inner_step_size:
+            inner_step_size = 2.5 * args.eps / args.inner_iter
+    elif args.inner_alg == "fw":
+        adv_opt_class = FrankWolfe
+        if not args.inner_step_size:
+            inner_step_size = None
+    elif args.inner_alg == "mfw":
+        adv_opt_class = MomentumFrankWolfe
+        if not args.inner_step_size:
+            inner_step_size = None
+    elif args.inner_alg == "none":
+        adv_opt_class = None
+        inner_step_size = None
+    else:
+        raise ValueError("This algorithm isn't implemented yet.")
 
-    writer.add_scalars("Test/Adv", asdict(report), epoch)
+    # Use default values for now
+    step_size_test = {
+        PGD.name: 5e4 * 2.5 * constraint.alpha / args.inner_iter_test,
+        PGDMadry.name: 2.5 * constraint.alpha / args.inner_iter_test,
+        FrankWolfe.name: None,
+        MomentumFrankWolfe.name: None
+    }
+
+
+    # Logging
+    writer = SummaryWriter(os.path.join("logging/cifar10/",
+                                        adv_opt_class.name if adv_opt_class else "Clean"))
+
+    # Training loop
+    for epoch in range(args.nb_epochs):
+        model.train()
+        train_loss = 0.
+        for data, target in tqdm(train_loader, desc=f'Training epoch {epoch}/{args.nb_epochs - 1}'):
+            data, target = data.to(device), target.to(device)
+
+            adv = Adversary(data.shape, constraint, adv_opt_class,
+                            device=device, random_init=random_init)
+            _, delta = adv.perturb(data, target, model, criterion,
+                                   inner_step_size,
+                                   iterations=args.inner_iter,
+                                   use_best=True,
+                                   tol=1e-7)
+            optimizer.zero_grad()
+            adv_loss = criterion(model(data + delta), target)
+            adv_loss.backward()
+            optimizer.step()
+
+            train_loss += adv_loss.item()
+
+        train_loss /= len(train_loader)
+        writer.add_scalar("Loss/train", train_loss, epoch)
+        print(f'Training loss: {train_loss:.3f}')
+        # TODO: get accuracy
+
+        # Evaluate on clean and adversarial test data
+
+        model.eval()
+        report = EasyDict(acc_cln=0., acc_pgd=0., acc_pgd_madry=0, acc_fw=0., acc_mfw=0.) 
+        nb_test = 0
+        for data, target in tqdm(test_loader, desc=f'Val epoch {epoch}/{args.nb_epochs - 1}'):
+            data, target = data.to(device), target.to(device)
+            
+            def get_nb_correct(alg_class):
+                adv = Adversary(data.shape,
+                                constraint,
+                                alg_class,
+                                device=device,
+                                random_init=args.random_init)
+                if alg_class:
+                    _, delta = adv.perturb(data, target, model, criterion,
+                                           step_size_test[alg_class.name],
+                                           iterations=args.inner_iter_test,
+                                           use_best=True,
+                                           tol=1e-7)
+                else:
+                    delta = 0.
+
+                _, pred = model(data + delta).max(1)
+                return pred.eq(target).sum().item()
+
+            nbs_correct = ((key, get_nb_correct(alg_class))
+                           for key, alg_class in (("cln", None),
+                                                  ("pgd", PGD),
+                                                  ("pgd_madry", PGDMadry),
+                                                  ("fw", FrankWolfe),
+                                                  ("mfw", MomentumFrankWolfe))
+                           )
+
+            for key, nb_correct in nbs_correct:
+                report["acc_" + key] += nb_correct
+
+            nb_test += data.size(0)
+
+        for key, val in report.items():
+            if "acc" in key:
+                report[key] /= nb_test
+
+        descs = ("clean examples", "adversarial examples PGD", "adversarial examples PGDMadry",
+                 "adversarial examples FW", "adversarial examples MFW")
+
+        for acc_val, desc in zip((report.acc_cln,
+                                  report.acc_pgd, report.acc_pgd_madry,
+                                  report.acc_fw, report.acc_mfw),
+                                 descs):
+            print(f'Val acc on {desc} (%): {acc_val * 100.:.3f}')
+
+        writer.add_scalars("Test/Acc", report, epoch)
+
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    main(args)
