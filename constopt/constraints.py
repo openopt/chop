@@ -140,12 +140,12 @@ class LpBall:
 class LinfBall(LpBall):
     p = np.inf
 
-    def prox(self, x, step_size=None):
+    def prox(self, x, step_size=None, batch=False):
         if torch.max(abs(x)) <= self.alpha:
             return x
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, batch=False):
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
         return update_direction, 1.
