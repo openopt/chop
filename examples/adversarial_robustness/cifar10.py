@@ -27,10 +27,10 @@ parser.add_argument("--eps", type=float, default=8./255)
 # parser.add_argument("--eps-test", type=float, default=None)
 parser.add_argument("--model", type=str, default="resnet18")
 parser.add_argument("--inner-step-size", type=float)
-parser.add_argument("--random_init", action="store_true")
+parser.add_argument("--random-init", action="store_true")
 parser.add_argument("--nb-epochs", default=50)
-parser.add_argument("--p", default='inf', help="2 | inf")
-
+parser.add_argument("--p", default='inf', help="inf")
+parser.add_argument("--log-path", type=str)
 
 def main(args):
     # Setup
@@ -88,15 +88,19 @@ def main(args):
     # Use default values for now
     step_size_test = {
         PGD.name: 5e4 * 2.5 * constraint.alpha / args.inner_iter_test,
-        PGDMadry.name: 2.5 * constraint.alpha / args.inner_iter_test,
+        PGDMadry.name: 2.5 / args.inner_iter_test,
         FrankWolfe.name: None,
         MomentumFrankWolfe.name: None
     }
 
 
+    # TODO: Find a way to easily log parameters in path
     # Logging
     writer = SummaryWriter(os.path.join("logging/cifar10/",
-                                        adv_opt_class.name if adv_opt_class else "Clean"))
+                                        adv_opt_class.name if adv_opt_class else "Clean",
+                                        args.log_path)
+                           )
+
 
     # Training loop
     for epoch in range(args.nb_epochs):
