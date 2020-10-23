@@ -158,24 +158,32 @@ class LinfBall(LpBall):
 class L1Ball(LpBall):
     p = 1
 
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, batch=False):
         """Returns s-x, s solving the linear problem
         max_{\|s\|_1 <= \\alpha} \\langle grad, s\\rangle
         """
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
-        largest_coordinate = torch.where(abs_grad == abs_grad.max())
+        if batch:
+            batch_size = iterate.size(0)
+            flatten_abs_grad = abs_grad.view(batch_size, -1)
+            flatten_largest_mask = (flatten_abs_grad == flatten_abs_grad.max(-1, True)[0])
+            largest = torch.where(flatten_largest_mask.view_as(abs_grad))
+        else:
+            largest = torch.where(abs_grad == abs_grad.max())
 
-        update_direction[largest_coordinate] += self.alpha * torch.sign(
-            grad[largest_coordinate])
+        update_direction[largest] += self.alpha * torch.sign(
+            grad[largest])
 
         return update_direction, 1.
 
-    def prox(self, x, step_size=None, dim=None):
+    def prox(self, x, step_size=None, batch=False):
         shape = x.shape
-        if dim == 0:
-            # TODO Vectorize using first dimension
-            x = euclidean_proj_l1ball(x.view(-1), self.alpha)
+        if batch:
+            flattened_x = x.view(shape[0], -1)
+            projected = [self.prox(row.view(-1), step_size, batch=False)
+                         for row in flattened_x]
+            x = torch.stack(projected)
         else:
             x = euclidean_proj_l1ball(x.view(-1), self.alpha)
         return x.view(*shape)
@@ -185,22 +193,34 @@ class L1Ball(LpBall):
 class L2Ball(LpBall):
     p = 2
 
-    def prox(self, x, step_size=None):
+    def prox(self, x, step_size=None, batch=False):
+        if batch:
+            shape = x.shape
+            norms = torch.norm(x.view(shape[0], -1), p=2, dim=-1)
+            mask = norms > self.alpha
+            projected = x.clone().detach()
+            projected[mask] = (projected[mask].T / norms[mask]).T
+            return self.alpha * projected.view(shape)
+
         norm = torch.sqrt((x ** 2).sum())
         if norm <= self.alpha:
             return x
         return self.alpha * x / norm
 
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, batch=False):
         """
         Returns s-x, s solving the linear problem
         max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
         """
         update_direction = iterate.clone().detach()
-        grad_norm = torch.sqrt((grad ** 2).sum())
-        update_direction += self.alpha * grad / grad_norm
+        if batch:
+            grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
+            update_direction += self.alpha * (grad.view(grad.size(0), -1).T
+                                              / grad_norms).T.view_as(iterate)
+        else:
+            grad_norm = torch.sqrt((grad ** 2).sum())
+            update_direction += self.alpha * grad / grad_norm
         return update_direction, 1.
-
 
 
 def make_LpBall(alpha, p=1):
