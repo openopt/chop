@@ -4,14 +4,15 @@ import numpy as np
 
 
 class Adversary:
-    def __init__(self, shape, constraint, optimizer_class, device=None, random_init=False):
+    def __init__(self, shape, constraint, optimizer_class,
+                 device=None, random_init=False):
         if random_init:
             self.delta = Variable(constraint.random_point(shape))
         else:
             self.delta = Variable(torch.zeros(shape))
         self.delta = self.delta.to(device)
         self.delta.requires_grad = True
-        self.optimizer = optimizer_class([self.delta], constraint) if optimizer_class is not None else None
+        self.optimizer = optimizer_class([self.delta], constraint) if optimizer_class else None
         self.constraint = constraint
 
     def perturb(self, data, target, model, criterion,
@@ -42,7 +43,7 @@ class Adversary:
             with torch.no_grad():
                 gap = self.constraint.fw_gap(self.delta.grad, self.delta)
 
-            self.optimizer.step(step_size)
+            self.optimizer.step(step_size, batch=True)
             ii += 1
 
             # Logging

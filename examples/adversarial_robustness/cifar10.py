@@ -29,7 +29,7 @@ parser.add_argument("--model", type=str, default="resnet18")
 parser.add_argument("--inner-step-size", type=float)
 parser.add_argument("--random-init", action="store_true")
 parser.add_argument("--nb-epochs", default=50)
-parser.add_argument("--p", default='inf', help="inf")
+parser.add_argument("--p", default='inf', help="1 | 2 | inf")
 parser.add_argument("--log-path", type=str)
 
 def main(args):
