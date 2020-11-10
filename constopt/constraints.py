@@ -1,4 +1,5 @@
 from copy import deepcopy
+from collections import defaultdict
 
 import torch
 
@@ -91,12 +92,12 @@ def euclidean_proj_l1ball(v, s=1.):
     w *= torch.sign(v)
     return w
 
-
 class LpBall:
     def __init__(self, alpha):
         if not 0. <= alpha:
             raise ValueError("Invalid constraint size alpha: {}".format(alpha))
         self.alpha = alpha
+        self.active_set = defaultdict(float)
 
     def fw_gap(self, grad, iterate):
         update_direction, _ = self.lmo(-grad, iterate)
@@ -149,11 +150,20 @@ class LinfBall(LpBall):
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
         return update_direction, 1.
-    
+
     def random_point(self, shape):
         """Returns a point of given shape uniformly at random from the constraint set."""
         return self.alpha * torch.FloatTensor(*shape).uniform_(-1, 1)
 
+    def lmo_pairwise(self, grad, iterate, active_set, batch=False):
+        fw_direction = self.lmo(grad, iterate, batch) + iterate.clone().detach()
+
+        away_direction = min(self.active_set.keys(),
+                             key=lambda v: torch.tensor(v).dot(grad))
+        max_step = self.active_set[away_direction]
+        away_direction = torch.tensor(away_direction)
+        return fw_direction - away_direction, max_step
+        
 
 class L1Ball(LpBall):
     p = 1

@@ -1,174 +1,178 @@
-import torch
-from torch.optim import Optimizer
-
-
 """This API is inspired by the COPT project
-https://github.com/openopt/copt"""
-class PGD(Optimizer):
-    """Projected Gradient Descent"""
-    name = 'PGD'
+https://github.com/openopt/copt.
 
-    def __init__(self, params, constraint):
-        self.prox = constraint.prox
-        defaults = dict(prox=self.prox, name=self.name)
-        super(PGD, self).__init__(params, defaults)
+This module contains full gradient optimizers in PyTorch."""
 
-    @torch.no_grad()
-    def step(self, step_size=None, batch=False, closure=None):
-        loss = None
-        if closure is not None:
-            with torch.enable_grad():
-                loss = closure()
-        for groups in self.param_groups:
-            for p in groups['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad
-                if grad.is_sparse:
-                    raise RuntimeError(
-                        'We do not yet support sparse gradients.')
-                state = self.state[p]
-                if len(state) == 0:
-                    state['step'] = 0.
-                state['step'] += 1.
-
-                if step_size is None:
-                    step_size = 1. / (state['step'] + 1.)
-
-                p.add_(self.prox(p - step_size * grad, batch=batch) - p)
-        return loss
+import torch
+import numpy as np
+from constopt import opt_utils
 
 
-class PGDMadry(Optimizer):
-    """What Madry et al. call PGD"""
-    name = 'PGD-Madry'
+def minimize_three_split(
+    closure,
+    x0,
+    prox1=None,
+    prox2=None,
+    tol=1e-6,
+    max_iter=1000,
+    verbose=0,
+    callback=None,
+    line_search=True,
+    step_size=None,
+    max_iter_backtracking=100,
+    backtracking_factor=0.7,
+    h_Lipschitz=None,
+    args_prox=(),
+):
 
-    def __init__(self, params, constraint):
-        self.prox = constraint.prox
-        self.lmo = constraint.lmo
-        defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
-        super(PGDMadry, self).__init__(params, defaults)
+    """Davis-Yin three operator splitting method.
+    This algorithm can solve problems of the form
 
-    @torch.no_grad()
-    def step(self, step_size=None, batch=False, closure=None):
-        loss = None
-        if closure is not None:
-            with torch.enable_grad():
-                loss = closure()
-        for groups in self.param_groups:
-            for p in groups['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad
-                if grad.is_sparse:
-                    raise RuntimeError(
-                        'We do not yet support sparse gradients.')
-                # Keep track of the step
-                state = self.state[p]
-                if len(state) == 0:
-                    state['step'] = 0.
-                state['step'] += 1.
+                minimize_x f(x) + g(x) + h(x)
 
-                if not step_size:
-                    step_size = 1. / (state['step'] + 1.)
+    where f is a smooth function and g and h are (possibly non-smooth)
+    functions for which the proximal operator is known.
 
-                lmo_res, _ = self.lmo(-p.grad, p, batch=batch)
-                normalized_grad = lmo_res + p
-                p.add_(self.prox(p + step_size * normalized_grad, batch=batch) - p)
-        return loss
+    Args:
+      f_grad: callable
+        Returns the function value and gradient of the objective function.
+        With return_gradient=False, returns only the function value.
 
+      x0 : array-like
+        Initial guess
 
-# TODO: Try rescaling the update_direction as alpha * \|gradient\|
-# + Demyanov Rubinov step-size
-class FrankWolfe(Optimizer):
-    """Vanilla Frank-Wolfe algorithm"""
-    name = 'Vanilla-FW'
+      prox_1 : callable or None
+        prox_1(x, alpha, *args) returns the proximal operator of g at xa
+        with parameter alpha.
 
-    def __init__(self, params, constraint):
-        self.lmo = constraint.lmo
-        defaults = dict(lmo=self.lmo, name=self.name)
-        super(FrankWolfe, self).__init__(params, defaults)
+      prox_2 : callable or None
+        prox_2(x, alpha, *args) returns the proximal operator of g at xa
+        with parameter alpha.
 
-    @torch.no_grad()
-    def step(self, step_size=None, batch=False, closure=None):
-        """Performs a single optimization step
+      tol: float
+        Tolerance of the stopping criterion.
 
-        Arguments:
-            step_size: Ignored by this optimizer
-            closure (callable, optional): A closure that reevaluates the model
-            and returns the loss"""
+      max_iter : int
+        Maximum number of iterations.
 
-        loss = None
-        if closure is not None:
-            with torch.enable_grad():
-                loss = closure()
-        for group in self.param_groups:
-            for p in group['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad
-                if grad.is_sparse:
-                    raise RuntimeError(
-                        'FW does not yet support sparse gradients.')
-                state = self.state[p]
-                if len(state) == 0:
-                    state['step'] = 0.
+      verbose : int
+        Verbosity level, from 0 (no output) to 2 (output on each iteration)
 
-                state['step'] += 1.
+      callback : callable.
+        callback function (optional). Takes a single argument (x) with the
+        current coefficients in the algorithm. The algorithm will exit if
+        callback returns False.
 
-                if step_size is None:
-                    step_size = 2. / (state['step'] + 2)
+      line_search : boolean
+        Whether to perform line-search to estimate the step size.
 
-                update_direction, _ = self.lmo(-p.grad, p, batch=batch)
-                p += step_size * update_direction
-        return loss
+      step_size : float
+        Starting value for the line-search procedure.
+
+      max_iter_backtracking: int
+        maximun number of backtracking iterations.  Used in line search.
+
+      backtracking_factor: float
+        the amount to backtrack by during line search.
+
+      args_prox: tuple
+        optional Extra arguments passed to the prox functions
 
 
-class MomentumFrankWolfe(Optimizer):
-    """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al.
-    This is essentially FrankWolfe with Momentum."""
-    name = 'Momentum-FW'
+    Returns:
+      res : OptimizeResult
+        The optimization result represented as a
+        ``scipy.optimize.OptimizeResult`` object. Important attributes are:
+        ``x`` the solution array, ``success`` a Boolean flag indicating if
+        the optimizer exited successfully and ``message`` which describes
+        the cause of the termination. See `scipy.optimize.OptimizeResult`
+        for a description of other attributes.
+    """
 
-    def __init__(self, params, constraint):
-        self.lmo = constraint.lmo
-        defaults = dict(lmo=self.lmo, name=self.name)
-        super(MomentumFrankWolfe, self).__init__(params, defaults)
+    success = False
+    if not max_iter_backtracking > 0:
+        raise ValueError("Line search iterations need to be greater than 0")
+
+    if prox1 is None:
+
+        def prox1(x, s=None, *args):
+            return x
+
+    if prox2 is None:
+
+        def prox2(x, s=None, *args):
+            return x
+
+    if step_size is None:
+        line_search = True
+        step_size = 1.0 / opt_utils.init_lipschitz(closure, x0)
+
+    z = prox2(x0, step_size, *args_prox)
+    LS_EPS = np.finfo(np.float).eps
+
+    fk, grad_fk = closure(z)
+
+    fk = closure(z, return_gradient=False)
+    fk.backward()
+    grad_fk = z.grad
+
+    x = prox1(z - step_size * grad_fk, step_size, *args_prox)
+    u = torch.zeros_like(x)
+
+    for it in range(max_iter):
+
+        fk, grad_fk = closure(z)
+        x = prox1(z - step_size * (u + grad_fk), step_size, *args_prox)
+        incr = x - z
+        norm_incr = np.linalg.norm(incr)
+        ls = norm_incr > 1e-7 and line_search
+        if ls:
+            for it_ls in range(max_iter_backtracking):
+                rhs = fk + grad_fk.dot(incr) + (norm_incr ** 2) / (2 * step_size)
+                ls_tol = closure(x, return_gradient=False) - rhs
+                if ls_tol <= LS_EPS:
+                    # step size found
+                    # if ls_tol > 0:
+                    #     ls_tol = 0.
+                    break
+                else:
+                    step_size *= backtracking_factor
+
+        z = prox2(x + step_size * u, step_size, *args_prox)
+        u += (x - z) / step_size
+        certificate = norm_incr / step_size
+
+        if ls and h_Lipschitz is not None:
+            if h_Lipschitz == 0:
+                step_size = step_size * 1.02
+            else:
+                quot = h_Lipschitz ** 2
+                tmp = np.sqrt(step_size ** 2 + (2 * step_size / quot) * (-ls_tol))
+                step_size = min(tmp, step_size * 1.02)
+
+        if callback is not None:
+            if callback(locals()) is False:
+                break
+
+        if it > 0 and certificate < tol:
+            success = True
+            break
+
+    return x
 
 
-    @torch.no_grad()
-    def step(self, step_size=None, momentum=None, batch=False, closure=None):
-        """Performs a single optimization step.
-        Arguments:
-            closure (callable, optional): A closure that reevaluates the model
-                and returns the loss
-            """
-        loss = None
-        if closure is not None:
-            with torch.enable_grad():
-                loss = closure()
-        for group in self.param_groups:
-            for p in group['params']:
-                if p.grad is None:
-                    continue
-                grad = p.grad
-                if grad.is_sparse:
-                    raise RuntimeError(
-                        'SFW does not yet support sparse gradients.')
-                state = self.state[p]
-                if len(state) == 0:
-                    state['step'] = 0
-                    state['grad_estimate'] = torch.zeros_like(
-                        p, memory_format=torch.preserve_format)
+def minimize_pgd_madry(x0, f_grad, prox, lmo, step_size=None, max_iter=200, prox_args=(), callback=None):
+    x = x0.detach().clone()
 
-                if step_size is None:
-                    step_size = 1. / (state['step'] + 1.)
-                if momentum is None:
-                    rho = (1. / (state['step'] + 1)) ** (1/3)
-                    momentum = 1. - rho
+    for it in range(max_iter):
+        x.requires_grad = True
+        loss, grad = f_grad(x)
+        with torch.no_grad():
+            update_direction, _ = lmo(-grad, x)
+            update_direction += x
+            x = prox(x + step_size * update_direction, step_size, *prox_args)
 
-                state['step'] += 1.
-
-                state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
-                update_direction, _ = self.lmo(-state['grad_estimate'], p, batch=False)
-                p += step_size * update_direction
-        return loss
+        if callback:
+            callback(locals())
+            
+    return x
