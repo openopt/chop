@@ -13,9 +13,11 @@ to visualize results using `cox` and `tensorboard`.
 
 ### Citing
 
+```
 @article{constopt-pytorch,
   author       = {Geoffrey Negiar, Fabian Pedregosa},
   title        = {constopt-pytorch: constrained optimization based on Pytorch},
   year         = 2020,
   url={http://github.com/openopt/constopt-pytorch}
 }
+```
