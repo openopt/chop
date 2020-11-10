@@ -13,6 +13,7 @@ to visualize results using `cox` and `tensorboard`.
 
 ### Citing
 
+If this software is useful to your research, please consider citing
 ```
 @article{constopt-pytorch,
   author       = {Geoffrey Negiar, Fabian Pedregosa},
