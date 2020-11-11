@@ -8,7 +8,7 @@ import shutil
 from cox.store import Store
 
 import constopt
-from constopt import optim
+from constopt import stochastic
 
 
 OUT_DIR = "logging/tests/test_optim"
@@ -30,8 +30,8 @@ y = abs(y / y.max())
 tol = 4e-3
 
 
-@pytest.mark.parametrize('algorithm', [optim.PGD, optim.PGDMadry,
-                                       optim.FrankWolfe, optim.MomentumFrankWolfe])
+@pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
+                                       stochastic.FrankWolfe, stochastic.MomentumFrankWolfe])
 @pytest.mark.parametrize('step_size', [1., .5, .1, .05, .001, 0.])
 def test_L1Ball(algorithm, step_size):
     # Setup

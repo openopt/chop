@@ -241,9 +241,9 @@ def make_LpBall(alpha, p=1):
 
     elif p == np.inf:
         return LinfBall(alpha)
-    
+
     raise NotImplementedError("We have only implemented ord={1, 2, np.inf} for now.")
-    
+
 
 class Simplex:
 

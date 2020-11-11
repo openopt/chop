@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from constopt.constraints import LinfBall
-from constopt.optim import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
+from constopt.stochastic import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
 
 torch.random.manual_seed(0)
 

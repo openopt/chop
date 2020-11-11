@@ -1,8 +1,9 @@
 """Tests for utility functions"""
 
+from constopt.utils import closure
 import torch
 from torch import nn
-from constopt import opt_utils
+from constopt import utils
 
 
 # Set up random regression problem
@@ -18,15 +19,13 @@ y = abs(y / y.max())
 tol = 4e-3
 
 
-def test_init_lipschitz():
-    criterion = nn.CrossEntropyLoss()
+# def test_init_lipschitz():
+criterion = nn.MSELoss(reduction='none')
 
-    def loss_fun(w):
-        return criterion(X.mv(w), y)
+@closure
+def loss_fun(X):
+    return criterion(X.mv(w), y)
 
-    w0 = torch.rand(n_features)
 
-    f0 = loss_fun(w0)
-    f0.backward()
-
-    L = opt_utils.init_lipschitz(loss_fun, w0.grad, w0)
+L = utils.init_lipschitz(loss_fun, X.detach().clone().requires_grad_(True))
+print(L)
