@@ -56,13 +56,13 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
 
     delta0 = torch.zeros_like(data, dtype=data.dtype)
 
-    # print("PGD Madry")
-    # delta_pgd_madry = cpt.optim.minimize_pgd_madry(delta0, loss_fun,
-    #                                                prox,
-    #                                                constraint.lmo,
-    #                                                step_size=2. / n_iter,
-    #                                                max_iter=n_iter,
-    #                                                callback=None).x
+    print("PGD Madry")
+    delta_pgd_madry = cpt.optim.minimize_pgd_madry(delta0, loss_fun,
+                                                   prox,
+                                                   constraint.lmo,
+                                                   step_size=2. / n_iter,
+                                                   max_iter=n_iter,
+                                                   callback=None).x
 
     print("Splitting.")
     delta_split = cpt.optim.minimize_three_split(delta0, loss_fun,
