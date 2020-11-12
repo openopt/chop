@@ -12,8 +12,8 @@ from constopt import utils
 
 
 def minimize_three_split(
-    x0,
     closure,
+    x0,
     prox1=None,
     prox2=None,
     tol=1e-6,
@@ -25,7 +25,8 @@ def minimize_three_split(
     max_iter_backtracking=100,
     backtracking_factor=0.7,
     h_Lipschitz=None,
-    args_prox=(),
+    *args_prox,
+    **kwargs_prox
 ):
 
     """Davis-Yin three operator splitting method.
@@ -37,21 +38,21 @@ def minimize_three_split(
     functions for which the proximal operator is known.
 
     Args:
-      x0 : torch.Tensor(shape: (batch_size, *))
-        Initial guess
-
       closure: callable
         Returns the function values and gradient of the objective function.
         With return_gradient=False, returns only the function values.
         Shape of return value: (batch_size, *)
 
-      prox_1 : callable or None
-        prox_1(x, alpha, *args) returns the proximal operator of g at xa
+      x0 : torch.Tensor(shape: (batch_size, *))
+        Initial guess
+
+      prox1 : callable or None
+        prox1(x, alpha, *args) returns the proximal operator of g at xa
         with parameter alpha.
         alpha can be a scalar or of shape (batch_size).
 
-      prox_2 : callable or None
-        prox_2(x, alpha, *args) returns the proximal operator of g at xa
+      prox2 : callable or None
+        prox2(x, alpha, *args) returns the proximal operator of g at xa
         with parameter alpha.
         alpha can be a scalar or of shape (batch_size).
 
@@ -72,8 +73,8 @@ def minimize_three_split(
       line_search : boolean
         Whether to perform line-search to estimate the step sizes.
 
-      step_size : float or None
-        Starting value for the line-search procedure.
+      step_size : float or tensor(shape: (batch_size,)) or None
+        Starting value(s) for the line-search procedure.
         if None, step_size will be estimated for each datapoint in the batch.
 
       max_iter_backtracking: int
@@ -82,21 +83,24 @@ def minimize_three_split(
       backtracking_factor: float
         the amount to backtrack by during line search.
 
-      args_prox: tuple
-        (optional) Extra arguments passed to the prox functions
+      args_prox: iterable
+        (optional) Extra arguments passed to the prox functions.
+
+      kwargs_prox: dict
+        (optional) Extra keyword arguments passed to the prox functions.
 
 
     Returns:
       res : OptimizeResult
         The optimization result represented as a
         ``scipy.optimize.OptimizeResult`` object. Important attributes are:
-        ``x`` the solution array, ``success`` a Boolean flag indicating if
+        ``x`` the solution tensor, ``success`` a Boolean flag indicating if
         the optimizer exited successfully and ``message`` which describes
         the cause of the termination. See `scipy.optimize.OptimizeResult`
         for a description of other attributes.
     """
 
-    success = False
+    success = torch.zeros(x0.size(0), dtype=bool)
     if not max_iter_backtracking > 0:
         raise ValueError("Line search iterations need to be greater than 0")
 
@@ -169,7 +173,7 @@ def minimize_three_split(
     return optimize.OptimizeResult(x=x, success=success, nit=it)
 
 
-def minimize_pgd_madry(x0, closure, prox, lmo, step_size=None, max_iter=200, prox_args=(), callback=None):
+def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, prox_args=(), callback=None):
     x = x0.detach().clone()
 
     for it in range(max_iter):
@@ -182,23 +186,61 @@ def minimize_pgd_madry(x0, closure, prox, lmo, step_size=None, max_iter=200, pro
 
         if callback is not None:
             if callback(locals()) is False:
-              break
+                break
 
     return optimize.OptimizeResult(x=x, nit=it)
 
 
-def minimize_pgd(x0, closure, prox, step_size=None, max_iter=200, prox_args=(),
+def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
+                 *prox_args,
                  callback=None):
+    """
+    Performs Projected Gradient Descent on batch of objectives of form:
+      f(x) + g(x).
+    We suppose we have access to gradient computation for f through closure,
+    and to the proximal operator of g in prox.
+
+    Args:
+      closure: callable
+
+      x0: torch.Tensor of shape (batch_size, *).
+
+      prox: callable
+        proximal operator of g
+
+      step_size: None or float or torch.tensor of shape (batch_size,).
+        step size to be used. If None, will be estimated at the beginning using line search.
+
+      max_iter: int
+        number of iterations to perform.
+
+      prox_args: tuple
+        (optional) additional args for prox
+
+      callback: callable
+        (optional) Any callable called on locals() at the end of each iteration.
+        Often used for logging.
+    """
     x = x0.detach().clone()
+
+    if step_size is None:
+        # estimate lipschitz constant
+        L = utils.init_lipschitz(closure, x0)
+        step_size = 1. / L
+
+    if type(step_size) == float:
+        step_size = torch.ones(x0.size(0)) * step_size
+
 
     for it in range(max_iter):
         x.requires_grad = True
         _, grad = closure(x)
         with torch.no_grad():
-            x = prox(x - step_size * grad, step_size, *prox_args)
+            x = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
 
         if callback is not None:
-            if callback.locals() is False:
-              break
+            if callback(locals()) is False:
+                break
 
-    return optimize.OptimizeResult(x=x, nit=it)
+    fval, grad = closure(x)
+    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)

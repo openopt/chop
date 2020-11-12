@@ -23,7 +23,7 @@ d1 = 10
 d2 = 5
 x0 = torch.ones(batch_size, d1, d2)
 
-def test_jacobian():
+def test_jacobian_batch():
     def loss(x):
         return (x.view(x.size(0), -1) ** 2).sum(-1)
 
@@ -31,6 +31,13 @@ def test_jacobian():
 
     assert jac.eq(2 * x0).all()
 
+
+def test_jacobian_single_sample():
+    def loss(x):
+        return (x ** 2).sum()
+
+    x0 = torch.rand(1, d1, d2)
+    val, jac = utils.get_func_and_jac(loss, x0)
 
 def test_closure():
 

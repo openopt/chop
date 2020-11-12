@@ -13,6 +13,8 @@ def get_func_and_jac(func, x, *args, **kwargs):
     batch_size = x.size(0)
     x.requires_grad = True
     output = func(x, *args, **kwargs)
+    if output.dim() == 0:
+        output = output.unsqueeze(0)
     output.backward(torch.ones(batch_size))
     return output.data, x.grad.data
 
@@ -35,21 +37,36 @@ def closure(f):
 
 def init_lipschitz(closure, x0, L0=1e-3, n_it=100):
     """Estimates the Lipschitz constant of closure
-    for each datapoint in the batch using backtracking line-search. x0: torch.tensor of shape (batch_size, *).
+    for each datapoint in the batch using backtracking line-search.
+
+    Args:
+      closure: callable
+        returns func_val, jacobian
+
+      x0: torch.tensor of shape (batch_size, *)
+
+      L0: float
+        initial guess
+
+      n_it: int
+        number of iterations
+
+    Returns:
+      Lt: torch.tensor of shape (batch_size,)
     """
 
-    Lt = (torch.ones(x0.size(0)) * L0).to(x0.device)
+    Lt = L0 * torch.ones(x0.size(0), device=x0.device, dtype=x0.dtype)
 
     f0, grad = closure(x0)
     xt = x0 - bmul((1. / Lt), grad)
 
-    ft = closure(xt, return_gradient=False)
+    ft = closure(xt, return_jac=False)
 
     for _ in range(n_it):
         mask = (ft > f0)
         Lt[mask] *= 10.
         xt = x0 - bmul(1. / Lt, grad)
-        ft = closure(xt, return_gradient=False)
+        ft = closure(xt, return_jac=False)
     return Lt
 
 
