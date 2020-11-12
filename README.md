@@ -13,6 +13,7 @@ Examples:
 
 We also define full-gradient constrained algorithms which operate on a batch of optimization problems.
 These are used for adversarial attacks.
+
 Examples:
 
 - `examples/optim_dynamics.py` for a generic example (one datapoint in the batch)
