@@ -6,7 +6,8 @@
 ### Stochastic Constrained Algorithms
 We define stochastic optimizers in the constopt.stochastic module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
 
-Examples: `examples/training_constrained_net_on_mnist.py` or `examples/stochastic_dynamics.py`.
+Examples:
+- `examples/training_constrained_net_on_mnist.py` for a model training use case.
 
 ### Full Gradient Constrained Algorithms
 
