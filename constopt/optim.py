@@ -176,19 +176,31 @@ def minimize_three_split(
 def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, prox_args=(), callback=None):
     x = x0.detach().clone()
 
+    if step_size is None:
+        # estimate lipschitz constant
+        # TODO: this is not the optimal step-size (if there even is one.)
+        # I don't recommend to use this.
+        L = utils.init_lipschitz(closure, x0)
+        step_size = 1. / L
+
+    if type(step_size) == float:
+        step_size = torch.ones(x0.size(0)) * step_size
+
     for it in range(max_iter):
         x.requires_grad = True
         _, grad = closure(x)
         with torch.no_grad():
             update_direction, _ = lmo(-grad, x)
             update_direction += x
-            x = prox(x + step_size * update_direction, step_size, *prox_args)
+            x = prox(x + utils.bmul(step_size, update_direction),
+                     step_size, *prox_args)
 
         if callback is not None:
             if callback(locals()) is False:
                 break
 
-    return optimize.OptimizeResult(x=x, nit=it)
+    fval, grad = closure(x)
+    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
 
 
 def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
@@ -244,3 +256,62 @@ def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
 
     fval, grad = closure(x)
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
+
+
+def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
+                         max_iter=200, callback=None):
+    """Performs the Frank-Wolfe algorithm on a batch of objectives of the form
+      min_x f(x)
+      s.t. x in C
+
+    where we have access to the Linear Minimization Oracle (LMO) of the constraint set C,
+    and the gradient of f through closure.
+
+    Args:
+      closure: callable
+        gives function values and the jacobian of f.
+
+      x0: torch.Tensor of shape (batch_size, *).
+        initial guess
+
+      lmo: callable
+        Returns update_direction, max_step_size
+
+      step: float or 'sublinear'
+        step-size scheme to be used.
+
+      max_iter: int
+        max number of iterations.
+
+      callback: callable
+        (optional) Any callable called on locals() at the end of each iteration.
+        Often used for logging.
+"""
+    x = x0.detach().clone()
+
+    if not ((type(step) == float) or step == 'sublinear'):
+        raise ValueError("step must be a float or 'sublinear'.")
+
+    if type(step) == float:
+        step_size = torch.ones(x.size(0), device=x.device, dtype=x.dtype) * step
+
+    for it in range(max_iter):
+
+        x.requires_grad = True
+        fval, grad = closure(x)
+        update_direction, max_step_size = lmo(-grad, x)
+
+        if step == 'sublinear':
+            step_size = 2. / (it + 2) * torch.ones(batch_size, dtype=x.dtype, device=x.device)
+
+        with torch.no_grad():
+            step_size = torch.max(step_size, max_step_size)
+            x += utils.bmul(update_direction, step_size)
+
+        if callback is not None:
+            if callback(locals()) is False:
+                break
+
+    fval, grad = closure(x)
+    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
+
