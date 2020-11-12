@@ -2,18 +2,33 @@ from functools import wraps
 import torch
 
 
+def get_func_and_jac(func, x, *args, **kwargs):
+    """Computes the jacobian of a batch-wise separable function func of x.
+    func returns a torch.Tensor of shape (batch_size,) when
+    x is a torch.Tensor of shape (batch_size, *).
+    Adapted from
+    https://gist.github.com/sbarratt/37356c46ad1350d4c30aefbd488a4faa 
+    by Shane Baratt"""
+
+    batch_size = x.size(0)
+    x.requires_grad = True
+    output = func(x, *args, **kwargs)
+    output.backward(torch.ones(batch_size))
+    return output.data, x.grad.data
+
+
 def closure(f):
     @wraps(f)
-    def wrapper(x, return_gradient=True, *args, **kwargs):
-        """Adds gradient computation when calling function."""
-        if not return_gradient:
+    def wrapper(x, return_jac=True, *args, **kwargs):
+        """Adds jacobian computation when calling function.
+        When return_jac is True, returns (value, jacobian)
+        instead of just value."""
+        if not return_jac:
             val = f(x, *args, **kwargs)
             return val
 
         x.grad = None
-        val = f(x, *args, **kwargs)
-        val.sum().backward()
-        return val, x.grad
+        return get_func_and_jac(f, x, *args, **kwargs)
 
     return wrapper
 

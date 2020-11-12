@@ -18,14 +18,38 @@ y = abs(y / y.max())
 
 tol = 4e-3
 
+batch_size = 20
+d1 = 10
+d2 = 5
+x0 = torch.ones(batch_size, d1, d2)
 
-# def test_init_lipschitz():
-criterion = nn.MSELoss(reduction='none')
+def test_jacobian():
+    def loss(x):
+        return (x.view(x.size(0), -1) ** 2).sum(-1)
 
-@closure
-def loss_fun(X):
-    return criterion(X.mv(w), y)
+    val, jac = utils.get_func_and_jac(loss, x0)
+
+    assert jac.eq(2 * x0).all()
 
 
-L = utils.init_lipschitz(loss_fun, X.detach().clone().requires_grad_(True))
-print(L)
+def test_closure():
+
+    @utils.closure
+    def loss(x):
+        return (x.view(x.size(0), -1) ** 2).sum(-1)
+
+    val, grad = loss(x0)
+    assert val.eq(torch.ones(batch_size) * (d1 * d2)).all()
+    assert grad.eq(2 * x0).all()
+
+
+def test_init_lipschitz():
+    criterion = nn.MSELoss(reduction='none')
+
+    @closure
+    def loss_fun(X):
+        return criterion(X.mv(w), y)
+
+    L = utils.init_lipschitz(loss_fun, X.detach().clone().requires_grad_(True))
+    print(L)
+
