@@ -92,6 +92,7 @@ def euclidean_proj_l1ball(v, s=1.):
     w *= torch.sign(v)
     return w
 
+
 class LpBall:
     def __init__(self, alpha):
         if not 0. <= alpha:

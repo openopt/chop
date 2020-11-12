@@ -1,5 +1,4 @@
 from constopt.utils import closure
-from functools import partial
 
 import torch
 from tqdm import tqdm
@@ -57,7 +56,7 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     delta0 = torch.zeros_like(data, dtype=data.dtype)
 
     print("PGD Madry")
-    delta_pgd_madry = cpt.optim.minimize_pgd_madry(delta0, loss_fun,
+    delta_pgd_madry = cpt.stochastic.minimize_pgd_madry(delta0, loss_fun,
                                                    prox,
                                                    constraint.lmo,
                                                    step_size=2. / n_iter,
@@ -65,7 +64,7 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
                                                    callback=None).x
 
     print("Splitting.")
-    delta_split = cpt.optim.minimize_three_split(delta0, loss_fun,
+    delta_split = cpt.stochastic.minimize_three_split(delta0, loss_fun,
                                                  prox1=constraint.prox,
                                                  prox2=image_constraint_prox,
                                                  step_size=None,

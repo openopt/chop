@@ -9,7 +9,7 @@ import numpy as np
 from cox.store import Store
 
 import constopt
-from constopt import optim
+from constopt import stochastic
 from constopt.adversary import Adversary
 
 
@@ -27,8 +27,8 @@ class LinearModel(nn.Module):
         return self.linear(x).view(batch_size, -1)
 
 
-@pytest.mark.parametrize('algorithm', [optim.PGD, optim.PGDMadry,
-                                       optim.FrankWolfe, optim.MomentumFrankWolfe])
+@pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
+                                       stochastic.FrankWolfe, stochastic.MomentumFrankWolfe])
 @pytest.mark.parametrize('step_size', [1, .5, .1, .05, .001, 0.])
 @pytest.mark.parametrize('p', [1, 2, np.inf])
 def test_adversary_synthetic_data(algorithm, step_size, p):
@@ -70,8 +70,8 @@ def test_adversary_synthetic_data(algorithm, step_size, p):
                                   tol=1e-7, store=store)
 
 
-@pytest.mark.parametrize('algorithm', [optim.PGD, optim.PGDMadry,
-                                       optim.FrankWolfe, optim.MomentumFrankWolfe])
+@pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
+                                       stochastic.FrankWolfe, stochastic.MomentumFrankWolfe])
 @pytest.mark.parametrize('step_size', [1, .5, .1, .05, .001, 0.])
 @pytest.mark.parametrize('p', [1, 2, np.inf])
 @pytest.mark.parametrize('random_init', [False, True])
