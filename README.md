@@ -4,15 +4,14 @@
 ## Examples
 
 ### Stochastic Constrained Algorithms
-We define stochastic optimizers in the constopt.stochastic module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
+We define stochastic optimizers in the `constopt.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
 
 Examples:
 - `examples/training_constrained_net_on_mnist.py` for a model training use case.
 
 ### Full Gradient Constrained Algorithms
 
-We also define full-gradient constrained algorithms which operate on a batch of optimization problems.
-These are used for adversarial attacks.
+We also define full-gradient constrained algorithms which operate on a batch of optimization problems in the `constopt.optim` module. These are used for adversarial attacks, using the `constopt.Adversary` wrapper.
 
 Examples:
 
