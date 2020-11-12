@@ -1,17 +1,27 @@
 # ConstOpt-PyTorch: a library for constrained optimization built on PyTorch
  ...with applications to Adversarially Training Neural Networks.
 
-### Examples
+## Examples
 
-Cf `examples/*` for MNIST and CIFAR10 examples. Results can be visualized using `tensorboard`.
+### Stochastic Constrained Algorithms
+We define stochastic optimizers in the constopt.stochastic module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
 
-### Tests
+Examples: `examples/training_constrained_net_on_mnist.py` or `examples/stochastic_dynamics.py`.
 
-Run the tests with `pytests tests`. Then, run
-```cox-tensorboard --logdir logging/tests/test_adversary --format-str alg-{algorithm}-step-size-{step-size}```
-to visualize results using `cox` and `tensorboard`.
+### Full Gradient Constrained Algorithms
 
-### Citing
+We also define full-gradient constrained algorithms which operate on a batch of optimization problems.
+These are used for adversarial attacks.
+Examples:
+
+- `examples/optim_dynamics.py` for a generic example (one datapoint in the batch)
+- `examples/adversarial_robustness/attack_benchmark.py` for how to use our algorithms for adversarial attacks. 
+
+## Tests
+
+Run the tests with `pytests tests`.
+
+## Citing
 
 If this software is useful to your research, please consider citing
 ```
