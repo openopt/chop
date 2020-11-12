@@ -30,6 +30,6 @@ If this software is useful to your research, please consider citing
   author       = {Geoffrey Negiar, Fabian Pedregosa},
   title        = {constopt-pytorch: constrained optimization based on Pytorch},
   year         = 2020,
-  url={http://github.com/openopt/constopt-pytorch}
+  url          = {http://github.com/openopt/constopt-pytorch}
 }
 ```
