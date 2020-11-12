@@ -175,6 +175,7 @@ def minimize_three_split(
 
 def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, prox_args=(), callback=None):
     x = x0.detach().clone()
+    batch_size = x.size(0)
 
     if step_size is None:
         # estimate lipschitz constant
@@ -184,7 +185,7 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, pro
         step_size = 1. / L
 
     if type(step_size) == float:
-        step_size = torch.ones(x0.size(0)) * step_size
+        step_size = torch.ones(batch_size, device=x.device) * step_size
 
     for it in range(max_iter):
         x.requires_grad = True
@@ -234,6 +235,7 @@ def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
         Often used for logging.
     """
     x = x0.detach().clone()
+    batch_size = x.size(0)
 
     if step_size is None:
         # estimate lipschitz constant
@@ -241,8 +243,7 @@ def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
         step_size = 1. / L
 
     if type(step_size) == float:
-        step_size = torch.ones(x0.size(0)) * step_size
-
+        step_size = torch.ones(batch_size, device=x.device) * step_size
 
     for it in range(max_iter):
         x.requires_grad = True
@@ -288,12 +289,13 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
         Often used for logging.
 """
     x = x0.detach().clone()
+    batch_size = x.size(0)
 
     if not ((type(step) == float) or step == 'sublinear'):
         raise ValueError("step must be a float or 'sublinear'.")
 
     if type(step) == float:
-        step_size = torch.ones(x.size(0), device=x.device, dtype=x.dtype) * step
+        step_size = torch.ones(batch_size, device=x.device, dtype=x.dtype) * step
 
     for it in range(max_iter):
 
@@ -314,4 +316,3 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
 
     fval, grad = closure(x)
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
-

@@ -15,7 +15,7 @@ def get_func_and_jac(func, x, *args, **kwargs):
     output = func(x, *args, **kwargs)
     if output.dim() == 0:
         output = output.unsqueeze(0)
-    output.backward(torch.ones(batch_size))
+    output.backward(torch.ones(batch_size, device=x.device))
     return output.data, x.grad.data
 
 
@@ -67,6 +67,9 @@ def init_lipschitz(closure, x0, L0=1e-3, n_it=100):
         Lt[mask] *= 10.
         xt = x0 - bmul(1. / Lt, grad)
         ft = closure(xt, return_jac=False)
+
+        if not mask.any():
+            break
     return Lt
 
 

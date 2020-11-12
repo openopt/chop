@@ -1,7 +1,6 @@
 """Sets up simple 2-d problems on Linf balls to see dynamics of different constrained optimization algorithms."""
 from functools import partial
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 
 from constopt.constraints import LinfBall
