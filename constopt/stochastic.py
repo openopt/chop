@@ -95,7 +95,7 @@ class PGD(Optimizer):
         super(PGD, self).__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, step_size=None, batch=False, closure=None):
+    def step(self, step_size=None, closure=None):
         loss = None
         if closure is not None:
             with torch.enable_grad():
@@ -116,7 +116,7 @@ class PGD(Optimizer):
                 if step_size is None:
                     step_size = 1. / (state['step'] + 1.)
 
-                p.add_(self.prox(p - step_size * grad, batch=batch) - p)
+                p.add_(self.prox(p - step_size * grad) - p)
         return loss
 
 
@@ -131,7 +131,7 @@ class PGDMadry(Optimizer):
         super(PGDMadry, self).__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, step_size=None, batch=False, closure=None):
+    def step(self, step_size=None, closure=None):
         loss = None
         if closure is not None:
             with torch.enable_grad():
@@ -153,9 +153,9 @@ class PGDMadry(Optimizer):
                 if not step_size:
                     step_size = 1. / (state['step'] + 1.)
 
-                lmo_res, _ = self.lmo(-p.grad, p, batch=batch)
+                lmo_res, _ = self.lmo(-p.grad, p)
                 normalized_grad = lmo_res + p
-                p.add_(self.prox(p + step_size * normalized_grad, batch=batch) - p)
+                p.add_(self.prox(p + step_size * normalized_grad) - p)
         return loss
 
 
@@ -171,7 +171,7 @@ class FrankWolfe(Optimizer):
         super(FrankWolfe, self).__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, step_size=None, batch=False, closure=None):
+    def step(self, step_size=None, closure=None):
         """Performs a single optimization step
 
         Arguments:
@@ -200,7 +200,7 @@ class FrankWolfe(Optimizer):
                 if step_size is None:
                     step_size = 2. / (state['step'] + 2)
 
-                update_direction, _ = self.lmo(-p.grad, p, batch=batch)
+                update_direction, _ = self.lmo(-p.grad, p)
                 p += step_size * update_direction
         return loss
 
@@ -226,7 +226,7 @@ class MomentumFrankWolfe(Optimizer):
         super(MomentumFrankWolfe, self).__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, step_size=None, momentum=None, batch=False, closure=None):
+    def step(self, step_size=None, momentum=None, closure=None):
         """Performs a single optimization step.
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
@@ -259,7 +259,7 @@ class MomentumFrankWolfe(Optimizer):
                 state['step'] += 1.
 
                 state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
-                update_direction, _ = self.lmo(-state['grad_estimate'], p, batch=False)
+                update_direction, _ = self.lmo(-state['grad_estimate'], p)
                 p += step_size * update_direction
         return loss
 

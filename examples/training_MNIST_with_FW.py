@@ -27,6 +27,10 @@ test_loader = get_mnist_test_loader(batch_size=512, shuffle=True)
 # Model setup
 model = LeNet5()
 model.to(device)
+
+# Initialize at 0
+for param in model.parameters():
+    param = torch.zeros_like(param)
 criterion = nn.CrossEntropyLoss()
 
 # Outer optimization parameters
@@ -36,20 +40,14 @@ momentum = .9
 
 # TODO: tune hyperparams for algorithms, and constraint sets
 # Choose optimizer here
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+# optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 alpha = 1.
 constraint = constopt.constraints.LinfBall(alpha)
-# optimizer = constopt.optim.PGD(model.parameters(), constraint)
-# optimizer = constopt.optim.PGDMadry(model.parameters(), constraint)
-# optimizer = constopt.optim.FrankWolfe(model.parameters(), constraint)
-# optimizer = constopt.optim.MomentumFrankWolfe(model.parameters(), constraint)
 
-# TODO: Actually log and plot stuff
-# Logging
-losses = []
-accuracies = []
-adv_losses = []
-adv_accuracies = []
+optimizer = constopt.stochastic.PGD(model.parameters(), constraint)
+# optimizer = constopt.stochastic.PGDMadry(model.parameters(), constraint)
+# optimizer = constopt.stochastic.FrankWolfe(model.parameters(), constraint)
+# optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint)
 
 
 # Training loop
@@ -62,7 +60,7 @@ for epoch in range(nb_epochs):
         optimizer.zero_grad()
         loss = criterion(model(data), target)
         loss.backward()
-        optimizer.step(step_size=step_size, momentum=momentum)
+        optimizer.step()
 
         train_loss += loss.item()
     train_loss /= len(train_loader)
@@ -75,6 +73,7 @@ for epoch in range(nb_epochs):
     report = EasyDict(nb_test=0, correct=0, correct_adv_pgd=0,
                       correct_adv_pgd_madry=0,
                       correct_adv_fw=0, correct_adv_mfw=0)
+
     for data, target in tqdm(test_loader, desc=f'Val epoch {epoch}/{nb_epochs - 1}'):
         data, target = data.to(device), target.to(device)
 

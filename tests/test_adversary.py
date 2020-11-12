@@ -1,20 +1,15 @@
 """Testing our adversarial attacks"""
 import pytest
-import shutil
 import torch
 from torch import nn
 
 
 import numpy as np
-from cox.store import Store
 
 import constopt
-from constopt import stochastic
+from constopt import optim
 from constopt.adversary import Adversary
 
-
-OUT_DIR = "logging/tests/test_adversary/"
-shutil.rmtree(OUT_DIR, ignore_errors=True)
 
 class LinearModel(nn.Module):
     def __init__(self):
@@ -27,8 +22,8 @@ class LinearModel(nn.Module):
         return self.linear(x).view(batch_size, -1)
 
 
-@pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
-                                       stochastic.FrankWolfe, stochastic.MomentumFrankWolfe])
+@pytest.mark.parametrize('algorithm', [optim.minimize_pgd, optim.minimize_pgd_madry,
+                                       optim.minimize_frank_wolfe])
 @pytest.mark.parametrize('step_size', [1, .5, .1, .05, .001, 0.])
 @pytest.mark.parametrize('p', [1, 2, np.inf])
 def test_adversary_synthetic_data(algorithm, step_size, p):
@@ -49,34 +44,44 @@ def test_adversary_synthetic_data(algorithm, step_size, p):
     criterion = nn.CrossEntropyLoss()
     constraint = constopt.constraints.make_LpBall(alpha=1., p=p)
 
-    adv = Adversary(data.shape, constraint, algorithm, device=device)
-    optimizer = adv.optimizer
-    # Logging
-
-    store = Store(OUT_DIR)
-    store.add_table('metadata', {'algorithm': str, 'step-size': float, 'p': float})
-
-    store['metadata'].append_row({'algorithm': optimizer.name, 'step-size': step_size,
-                                  'p': p})
-    table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
-    store.add_table(table_name, {'func_val': float, 'FW gap': float,
-                                                  'norm delta': float})
+    adv = Adversary(algorithm)
 
     # Get nominal loss
     output = model(data)
     loss = criterion(output, target)
+
+    # Algorithm arguments:
+    if algorithm == optim.minimize_pgd:
+        alg_kwargs = {
+            'prox': constraint.prox,
+            'max_iter': 50
+        }
+    elif algorithm == optim.minimize_pgd_madry:
+        alg_kwargs = {
+            'prox': constraint.prox,
+            'lmo': constraint.lmo,
+            'max_iter': 50,
+            'step': 2. * constraint.alpha / 50
+        }
+
+    elif algorithm == optim.minimize_frank_wolfe:
+        alg_kwargs = {
+            'lmo': constraint.lmo,
+            'step': 'sublinear',
+            'max_iter': 50
+        }
+
     # Run perturbation
-    adv_loss, delta = adv.perturb(data, target, model, criterion, step_size, iterations=100,
-                                  tol=1e-7, store=store)
+    adv_loss, delta = adv.perturb(data, target, model, criterion, **alg_kwargs)
 
 
-@pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
-                                       stochastic.FrankWolfe, stochastic.MomentumFrankWolfe])
-@pytest.mark.parametrize('step_size', [1, .5, .1, .05, .001, 0.])
+@pytest.mark.parametrize('algorithm', [optim.minimize_pgd, optim.minimize_pgd_madry,
+                                       optim.minimize_frank_wolfe
+                                       ])
+@pytest.mark.parametrize('step', [1., .5, .1, .05, None])
 @pytest.mark.parametrize('p', [1, 2, np.inf])
-@pytest.mark.parametrize('random_init', [False, True])
 @pytest.mark.parametrize('model_filename', ["mnist_lenet5_clntrained.pt", "mnist_lenet5_advtrained.pt"])
-def test_adversary_mnist(algorithm, step_size, p, random_init, model_filename):
+def test_adversary_mnist(algorithm, step, p, model_filename):
 
     import os
     from advertorch.test_utils import LeNet5
@@ -106,32 +111,29 @@ def test_adversary_mnist(algorithm, step_size, p, random_init, model_filename):
 
     data, target = data.to(device), target.to(device)
 
-    adv = Adversary(data.shape, constraint, algorithm, device=device, random_init=random_init)
-    optimizer = adv.optimizer
-    # Logging
+    adv = Adversary(algorithm)
 
-    store = Store(os.path.join(OUT_DIR, "test_mnist/"))
-    store.add_table('metadata', {'algorithm': str,
-                                 'step-size': float,
-                                 'p': float,
-                                 'training_mode': str,
-                                 'random_init': int})
+    if algorithm == optim.minimize_pgd:
+        alg_kwargs = {
+            'prox': constraint.prox,
+            'max_iter': 50,
+            'step': step
+        }
+    elif algorithm == optim.minimize_pgd_madry:
+        alg_kwargs = {
+            'prox': constraint.prox,
+            'lmo': constraint.lmo,
+            'max_iter': 50,
+            'step': step
+        }
 
-    mode = 'adv' if 'adv' in model_filename else 'cln'
-    store['metadata'].append_row({'algorithm': optimizer.name,
-                                  'step-size': step_size,
-                                  'p': p,
-                                  'training_mode': mode,
-                                  'random_init': int(random_init)})
+    elif algorithm == optim.minimize_frank_wolfe:
+        alg_kwargs = {
+            'lmo': constraint.lmo,
+            'step': step if step else 'sublinear',
+            'max_iter': 50
+        }
 
-    table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
-    store.add_table(table_name, {'func_val': float, 'FW gap': float,
-                                 'norm delta': float})
-
-    # Get nominal loss
-    # output = model(data)
-    # loss = criterion(output, target)
     # Run and log perturbation
-    adv_loss, delta = adv.perturb(data, target, model, criterion, step_size,
-                                  iterations=20,
-                                  tol=1e-7, store=store)
+    adv_loss, delta = adv.perturb(data, target, model, criterion,
+                                  **alg_kwargs)

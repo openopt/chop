@@ -1,3 +1,4 @@
+from constopt.optim import minimize_pgd, minimize_pgd_madry
 from constopt.utils import closure
 
 import torch
@@ -5,6 +6,7 @@ from tqdm import tqdm
 
 import constopt as cpt
 from constopt.data import load_cifar10
+from constopt.adversary import Adversary
 
 from robustbench.utils import load_model
 
@@ -20,7 +22,7 @@ model = load_model(model_name, norm='Linf').to(device)
 criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
 # Define the perturbation constraint set
-n_iter = 20
+max_iter = 20
 alpha = 8 / 255.
 constraint = cpt.constraints.LinfBall(alpha)
 
@@ -35,11 +37,6 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     data = data.to(device)
     target = target.to(device)
 
-    @closure
-    def loss_fun(delta):
-        adv_input = data + delta
-        return -criterion(model(adv_input), target)
-
     def image_constraint_prox(delta, step_size=None):
         """Projects perturbation delta
         so that 0. <= data + delta <= 1."""
@@ -53,19 +50,21 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
         delta = image_constraint_prox(delta, step_size)
         return delta
 
-    delta0 = torch.zeros_like(data, dtype=data.dtype)
+    adversary_pgd = Adversary(minimize_pgd)
+    adversary_pgd_madry = Adversary(minimize_pgd_madry)
 
-    delta_pgd_madry = cpt.optim.minimize_pgd_madry(loss_fun,
-                                                   delta0,
-                                                   prox,
-                                                   constraint.lmo,
-                                                   step_size=2. / n_iter,
-                                                   max_iter=n_iter,
-                                                   callback=None).x
+    _, delta_pgd = adversary_pgd.perturb(data, target, model, criterion,
+                                         use_best=False,
+                                         prox=prox,
+                                         max_iter=max_iter)
 
-    delta_pgd = cpt.optim.minimize_pgd(loss_fun, delta0, constraint.prox,
-                                       step_size=None, max_iter=n_iter).x
- 
+    _, delta_pgd_madry = adversary_pgd_madry.perturb(data, target, model,
+                                                     criterion,
+                                                     use_best=False,
+                                                     prox=prox,
+                                                     lmo=constraint.lmo,
+                                                     step=2 * constraint.alpha / max_iter, 
+                                                     max_iter=max_iter)
 
     label = torch.argmax(model(data), dim=-1)
     n_correct += (label == target).sum().item()

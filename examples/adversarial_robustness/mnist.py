@@ -12,7 +12,7 @@ from advertorch_examples.utils import get_mnist_test_loader
 
 import constopt
 from constopt.adversary import Adversary
-from constopt.optim import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
+from constopt.stochastic import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
 
 # Setup
 torch.manual_seed(0)
@@ -66,7 +66,7 @@ for epoch in range(nb_epochs):
                         device=device, random_init=random_init)
         _, delta = adv.perturb(data, target, model, criterion,
                                step_size,
-                               iterations=inner_iter,
+                               max_iter=inner_iter,
                                tol=1e-7)
         optimizer.zero_grad()
         adv_loss = criterion(model(data + delta), target)
@@ -92,16 +92,16 @@ for epoch in range(nb_epochs):
         adv_mfw = Adversary(data.shape, constraint, MomentumFrankWolfe, device=device, random_init=False)
         # Compute different perturbations
         _, delta_pgd = adv_pgd.perturb(data, target, model, criterion, step_size_test,
-                               iterations=inner_iter_test,
+                               max_iter=inner_iter_test,
                                tol=1e-7)
         _, delta_pgd_madry = adv_pgd_madry.perturb(data, target, model, criterion, step_size_test,
-                               iterations=inner_iter_test,
+                               max_iter=inner_iter_test,
                                tol=1e-7)
         _, delta_fw = adv_fw.perturb(data, target, model, criterion, step_size_test,
-                               iterations=inner_iter_test,
+                               max_iter=inner_iter_test,
                                tol=1e-7)
         _, delta_mfw = adv_mfw.perturb(data, target, model, criterion, step_size_test,
-                               iterations=inner_iter_test,
+                               max_iter=inner_iter_test,
                                tol=1e-7)
         # Compute corresponding predictions        
         _, pred = model(data).max(1)

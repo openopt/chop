@@ -47,7 +47,7 @@ def euclidean_proj_simplex(v, s=1.):
     u, _ = torch.sort(v, descending=True)
     cssv = torch.cumsum(u, dim=-1)
     # get the number of > 0 components of the optimal solution
-    rho = torch.nonzero(u * torch.arange(1, n + 1, device=v.device) > (cssv - s))[-1]
+    rho = (u * torch.arange(1, n + 1, device=v.device) > (cssv - s)).sum() - 1
     # compute the Lagrange multiplier associated to the simplex constraint
     theta = (cssv[rho] - s) / (rho + 1.0)
     # compute the projection by thresholding v using theta
@@ -142,22 +142,22 @@ class LpBall:
 class LinfBall(LpBall):
     p = np.inf
 
-    def prox(self, x, step_size=None, batch=False):
+    def prox(self, x, step_size=None):
         if torch.max(abs(x)) <= self.alpha:
             return x
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
-    def lmo(self, grad, iterate, batch=False):
+    def lmo(self, grad, iterate):
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
-        return update_direction, 1.
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     def random_point(self, shape):
         """Returns a point of given shape uniformly at random from the constraint set."""
         return self.alpha * torch.FloatTensor(*shape).uniform_(-1, 1)
 
-    def lmo_pairwise(self, grad, iterate, active_set, batch=False):
-        fw_direction = self.lmo(grad, iterate, batch) + iterate.clone().detach()
+    def lmo_pairwise(self, grad, iterate, active_set):
+        fw_direction = self.lmo(grad, iterate) + iterate.clone().detach()
 
         away_direction = min(self.active_set.keys(),
                              key=lambda v: torch.tensor(v).dot(grad))
@@ -186,7 +186,7 @@ class L1Ball(LpBall):
         update_direction[largest] += self.alpha * torch.sign(
             grad[largest])
 
-        return update_direction, 1.
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     def prox(self, x, step_size=None, batch=False):
         shape = x.shape
@@ -231,7 +231,7 @@ class L2Ball(LpBall):
         else:
             grad_norm = torch.sqrt((grad ** 2).sum())
             update_direction += self.alpha * grad / grad_norm
-        return update_direction, 1.
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
 
 def make_LpBall(alpha, p=1):
@@ -261,4 +261,4 @@ class Simplex:
             grad[largest_coordinate]
         )
 
-        return update_direction, 1.
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)

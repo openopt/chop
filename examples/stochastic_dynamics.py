@@ -74,7 +74,7 @@ if __name__ == "__main__":
         ax.plot(np.arange(iterations + 1), losses_all[opt_class.name],
                 label=opt_class.name)
     fig.legend()
-    fig.savefig("examples/plots/2-D_Linf_losses.png")
+    fig.savefig("examples/plots/stochastic/2-D_Linf_losses.png")
 
     fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
     for ax, opt_class in zip(axes.reshape(-1), OPTIMIZER_CLASSES):
@@ -83,4 +83,4 @@ if __name__ == "__main__":
         ax.set_ylim(-1, 1)
         ax.legend(loc='lower left')
 
-    fig.savefig("examples/plots/2-D_Linf_iterates.png")
+    fig.savefig("examples/plots/stochastic/2-D_Linf_iterates.png")

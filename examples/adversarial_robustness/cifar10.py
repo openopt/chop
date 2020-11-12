@@ -113,7 +113,7 @@ def main(args):
                             device=device, random_init=random_init)
             _, delta = adv.perturb(data, target, model, criterion,
                                    inner_step_size,
-                                   iterations=args.inner_iter,
+                                   max_iter=args.inner_iter,
                                    use_best=True,
                                    tol=1e-7)
             optimizer.zero_grad()
@@ -145,7 +145,7 @@ def main(args):
                 if alg_class:
                     _, delta = adv.perturb(data, target, model, criterion,
                                            step_size_test[alg_class.name],
-                                           iterations=args.inner_iter_test,
+                                           max_iter=args.inner_iter_test,
                                            use_best=True,
                                            tol=1e-7)
                 else:

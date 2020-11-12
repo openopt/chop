@@ -21,7 +21,7 @@ def minimize_three_split(
     verbose=0,
     callback=None,
     line_search=True,
-    step_size=None,
+    step=None,
     max_iter_backtracking=100,
     backtracking_factor=0.7,
     h_Lipschitz=None,
@@ -118,49 +118,49 @@ def minimize_three_split(
 
     x = x0.detach().clone().requires_grad_(True)
 
-    if step_size is None:
+    if step is None:
         line_search = True
-        step_size = 1.0 / utils.init_lipschitz(closure, x)
+        step = 1.0 / utils.init_lipschitz(closure, x)
 
     with torch.no_grad():
-        z = prox2(x, step_size, *args_prox)
+        z = prox2(x, step, *args_prox)
         z.requires_grad = True
 
     fk, grad_fk = closure(z)
 
     with torch.no_grad():
-        x = prox1(z - utils.bmul(step_size, grad_fk), step_size, *args_prox)
+        x = prox1(z - utils.bmul(step, grad_fk), step, *args_prox)
         u = torch.zeros_like(x)
 
     for it in range(max_iter):
         print(it)
         fk, grad_fk = closure(z)
         with torch.no_grad():
-            x = prox1(z - utils.bmul(step_size, u + grad_fk), step_size, *args_prox)
+            x = prox1(z - utils.bmul(step, u + grad_fk), step, *args_prox)
             incr = x - z
             norm_incr = torch.norm(incr.view(incr.size(0), -1), dim=-1)
-            rhs = fk + utils.bdot(grad_fk, incr) + ((norm_incr ** 2) / (2 * step_size))
+            rhs = fk + utils.bdot(grad_fk, incr) + ((norm_incr ** 2) / (2 * step))
             ls_tol = closure(x, return_gradient=False)
             mask = torch.bitwise_and(norm_incr > 1e-7, line_search)
             ls = mask.any()
             # TODO: optimize code in this loop using mask
             for it_ls in range(max_iter_backtracking):
-                rhs[mask] = fk[mask] + utils.bdot(grad_fk[mask], incr[mask]) + ((norm_incr ** 2) / (2 * step_size[mask]))
+                rhs[mask] = fk[mask] + utils.bdot(grad_fk[mask], incr[mask]) + ((norm_incr ** 2) / (2 * step[mask]))
                 ls_tol[mask] = closure(x, return_gradient=False)[mask] - rhs[mask]
                 mask &= (ls_tol <= LS_EPS)
-                step_size[mask] *= backtracking_factor
+                step[mask] *= backtracking_factor
 
-            z = prox2(x + utils.bmul(step_size, u), step_size, *args_prox).requires_grad_(True)
-            u += utils.bmul(x - z, 1. / step_size)
-            certificate = norm_incr / step_size
+            z = prox2(x + utils.bmul(step, u), step, *args_prox).requires_grad_(True)
+            u += utils.bmul(x - z, 1. / step)
+            certificate = norm_incr / step
 
             if ls and h_Lipschitz is not None:
                 if h_Lipschitz == 0:
-                    step_size = step_size * 1.02
+                    step = step * 1.02
                 else:
                     quot = h_Lipschitz ** 2
-                    tmp = torch.sqrt(step_size ** 2 + (2 * step_size / quot) * (-ls_tol))
-                    step_size = torch.min(tmp, step_size * 1.02)
+                    tmp = torch.sqrt(step ** 2 + (2 * step / quot) * (-ls_tol))
+                    step = torch.min(tmp, step * 1.02)
 
         if callback is not None:
             if callback(locals()) is False:
@@ -173,19 +173,19 @@ def minimize_three_split(
     return optimize.OptimizeResult(x=x, success=success, nit=it)
 
 
-def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, prox_args=(), callback=None):
+def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_args=(), callback=None):
     x = x0.detach().clone()
     batch_size = x.size(0)
 
-    if step_size is None:
+    if step is None:
         # estimate lipschitz constant
         # TODO: this is not the optimal step-size (if there even is one.)
         # I don't recommend to use this.
         L = utils.init_lipschitz(closure, x0)
-        step_size = 1. / L
+        step = 1. / L
 
-    if type(step_size) == float:
-        step_size = torch.ones(batch_size, device=x.device) * step_size
+    if type(step) == float:
+        step = torch.ones(batch_size, device=x.device) * step
 
     for it in range(max_iter):
         x.requires_grad = True
@@ -193,8 +193,8 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, pro
         with torch.no_grad():
             update_direction, _ = lmo(-grad, x)
             update_direction += x
-            x = prox(x + utils.bmul(step_size, update_direction),
-                     step_size, *prox_args)
+            x = prox(x + utils.bmul(step, update_direction),
+                     step, *prox_args)
 
         if callback is not None:
             if callback(locals()) is False:
@@ -204,7 +204,7 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step_size=None, max_iter=200, pro
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
 
 
-def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
+def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
                  *prox_args,
                  callback=None):
     """
@@ -221,7 +221,7 @@ def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
       prox: callable
         proximal operator of g
 
-      step_size: None or float or torch.tensor of shape (batch_size,).
+      step: None or float or torch.tensor of shape (batch_size,).
         step size to be used. If None, will be estimated at the beginning using line search.
 
       max_iter: int
@@ -237,19 +237,19 @@ def minimize_pgd(closure, x0, prox, step_size=None, max_iter=200,
     x = x0.detach().clone()
     batch_size = x.size(0)
 
-    if step_size is None:
+    if step is None:
         # estimate lipschitz constant
         L = utils.init_lipschitz(closure, x0)
-        step_size = 1. / L
+        step = 1. / L
 
-    if type(step_size) == float:
-        step_size = torch.ones(batch_size, device=x.device) * step_size
+    if type(step) == float:
+        step = torch.ones(batch_size, device=x.device) * step
 
     for it in range(max_iter):
         x.requires_grad = True
-        _, grad = closure(x)
+        fval, grad = closure(x)
         with torch.no_grad():
-            x = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
+            x = prox(x - utils.bmul(step, grad), step, *prox_args)
 
         if callback is not None:
             if callback(locals()) is False:

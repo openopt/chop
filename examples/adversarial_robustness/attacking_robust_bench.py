@@ -27,7 +27,7 @@ for alg_class in PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe:
     adv = Adversary(data.shape, constraint, alg_class, device)
     adv_loss, delta = adv.perturb(data, target, model, criterion,
                                   step_size=step_size_test[alg_class.name],
-                                  iterations=n_iter)
+                                  max_iter=n_iter)
     _, pred = model(data + delta).max(1)
     accuracy = pred.eq(target).sum().item() / data.size(0)
     print(f"Robust accuracy on {alg_class.name} (%): {accuracy * 100.:.3f}")

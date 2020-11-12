@@ -1,76 +1,55 @@
 import torch
-from torch.autograd import Variable
 import numpy as np
+
+from constopt import utils
 
 
 class Adversary:
-    def __init__(self, shape, constraint, optimizer_class,
-                 device=None, random_init=False):
-        if random_init:
-            self.delta = Variable(constraint.random_point(shape))
-        else:
-            self.delta = Variable(torch.zeros(shape))
-        self.delta = self.delta.to(device)
-        self.delta.requires_grad = True
-        self.optimizer = optimizer_class([self.delta], constraint) if optimizer_class else None
-        self.constraint = constraint
+    def __init__(self, method):
+        self.method = method
 
     def perturb(self, data, target, model, criterion,
-                step_size=None, tol=1e-6, iterations=None,
+                step=None, max_iter=20,
                 use_best=False,
-                store=None):
+                random_init=None,
+                callback=None,
+                *optimizer_args,
+                **optimizer_kwargs):
 
-        if self.optimizer is None:
-            return criterion(model(data), target), 0.
-        was_training = model.training
-        model.eval()
-        ii = 0
+        device = data.device
+        batch_size = data.size(0)
 
-        gap = torch.tensor(np.inf)
-        best_loss = -torch.tensor(np.inf)
-        while gap.item() > tol:
-            if ii == iterations:
-                break
+        @utils.closure
+        def loss(delta):
+            return -criterion(model(data + delta), target)
 
-            self.optimizer.zero_grad()
-            output = model(data + self.delta)
-            adv_loss = -criterion(output, target)
-            if -adv_loss.item() > best_loss.item():
-                best_loss = -adv_loss.clone().detach()
-                best_delta = self.delta.clone().detach()
-            adv_loss.backward()
+        if random_init is None:
+            delta0 = torch.zeros_like(data, device=device)
 
-            with torch.no_grad():
-                gap = self.constraint.fw_gap(self.delta.grad, self.delta)
+        else:
+            delta0 = random_init(data.shape)
 
-            self.optimizer.step(step_size, batch=True)
-            ii += 1
+        class UseBest:
+            def __init__(self):
+                self.best = torch.zeros_like(data)
+                self.best_loss = -np.inf * torch.ones(batch_size, device=device)
 
-            # Logging
-            if store:
-                # Might be better to use the same name for all optimizers, to get
-                # only one plot
-                def norm(x):
-                    if self.constraint.p == 1:
-                        return abs(x).sum()
-                    if self.constraint.p == 2:
-                        return torch.sqrt((x ** 2).sum())
-                    if self.constraint.p == np.inf:
-                        return abs(x).max()
-                    raise NotImplementedError("We've only implemented p = 1, 2, np.inf")
-                p = self.constraint.p
-                table_name = "L" + str(int(p)) + " ball" if p != np.inf else "Linf Ball"
-                store.log_table_and_tb(table_name,
-                                       {'func_val': -adv_loss.item(),
-                                        'FW gap': gap.item(),
-                                        'norm delta': norm(self.delta)
-                                        })
-                store[table_name].flush_row()
+            def __call__(self, kwargs):
+                mask = (kwargs['fval'] < self.best_loss)
+                self.best_loss[mask] = kwargs['fval'][mask]
+                self.best[mask] = kwargs['x'][mask].detach().clone()
 
-        if was_training:
-            model.train()
+                if callback is not None:
+                    return callback(kwargs)
+
+
+        cb = UseBest() if use_best else callback
+
+        sol = self.method(loss, delta0, step=step, max_iter=max_iter, 
+                          *optimizer_args, callback=cb,
+                          **optimizer_kwargs)
 
         if use_best:
-            return -best_loss, best_delta
+            return -cb.best_loss, cb.best
 
-        return -adv_loss, self.delta
+        return sol.fval, sol.x
