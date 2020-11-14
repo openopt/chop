@@ -9,7 +9,53 @@ from torch.distributions import Laplace, Normal
 # TODO: Add projections to the constraints, and write ProjectedOptimizer wrapper/decorator
 
 """This uses an API similar to the one for
-the COPT project, https://github.com/openopt/copt."""
+the COPT project, https://github.com/openopt/copt.
+Part of this code is adapted from https://github.com/ZIB-IOL."""
+
+
+@torch.no_grad()
+def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
+    """Computes the average norm of default layer initialization"""
+    output = 0
+    for _ in range(repetitions):
+        layer.reset_parameters()
+        output += torch.norm(getattr(layer, param_type), p=p).item()
+    return float(output) / repetitions
+
+
+@torch.no_grad()
+def create_lp_constraints(model, p=2, value=300, mode='initialization'):
+    """Create LpBall constraints for each layer of model, and value depends on mode (either radius or
+    factor to multiply average initialization norm with)"""
+    constraints = []
+
+    # Compute average init norms if necessary
+    init_norms = dict()
+    if mode == 'initialization':
+        for layer in model.modules():
+            if hasattr(layer, 'reset_parameters'):
+                for param_type in [entry for entry in ['weight', 'bias'] if (hasattr(layer, entry) and
+                                                                             type(getattr(layer, entry)) != type(
+                            None))]:
+                    param = getattr(layer, param_type)
+                    shape = param.shape
+
+                    avg_norm = get_avg_init_norm(layer, param_type=param_type, p=2)
+                    if avg_norm == 0.0:
+                        # Catch unlikely case that weight/bias is 0-initialized (e.g. BatchNorm does this)
+                        avg_norm = 1.0
+                    init_norms[shape] = avg_norm
+
+    for name, param in model.named_parameters():
+        if mode == 'radius':
+            constraint = make_LpBall(value, p=p)
+        elif mode == 'initialization':
+            alpha = value * init_norms[param.shape]
+            constraint = make_LpBall(alpha, p=p)
+        else:
+            raise ValueError(f"Unknown mode {mode}")
+        constraints.append(constraint)
+    return constraints
 
 
 @torch.no_grad()
@@ -205,8 +251,8 @@ class L1Ball(LpBall):
     def prox(self, x, step_size=None):
         shape = x.shape
         flattened_x = x.view(shape[0], -1)
-        projected = [self.prox(row.view(-1), step_size, batch=False)
-                        for row in flattened_x]
+        # TODO vectorize this
+        projected = [euclidean_proj_l1ball(row) for row in flattened_x]
         x = torch.stack(projected)
         return x.view(*shape)
 
