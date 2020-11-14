@@ -159,8 +159,6 @@ class PGDMadry(Optimizer):
         return loss
 
 
-# TODO: Try rescaling the update_direction as alpha * \|gradient\|
-# + Demyanov Rubinov step-size
 class FrankWolfe(Optimizer):
     """Vanilla Frank-Wolfe algorithm"""
     name = 'Vanilla-FW'
@@ -215,9 +213,13 @@ class PairwiseFrankWolfe(Optimizer):
     """Pairwise Frank-Wolfe algorithm"""
     name = "Pairwise-FW"
 
-    def __init__(self, params, constraint):
+    def __init__(self, params, constraint, lr=.1, momentum=.9):
+        if not (type(lr) == float or lr == 'sublinear'):
+            raise ValueError("lr must be float or 'sublinear'.")
         self.lmo = constraint.lmo_pairwise
-        defaults = dict(lmo=self.lmo, name=self.name)
+        self.lr = lr
+        self.momentum = momentum
+        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
         super(PairwiseFrankWolfe, self).__init__(params, defaults)
 
 
@@ -228,13 +230,15 @@ class MomentumFrankWolfe(Optimizer):
     https://arxiv.org/abs/2010.07243"""
     name = 'Momentum-FW'
 
-    def __init__(self, params, constraint):
+    def __init__(self, params, constraint, lr=.1, momentum=.9):
         self.lmo = constraint.lmo
-        defaults = dict(lmo=self.lmo, name=self.name)
+        self.lr = lr
+        self.momentum = momentum
+        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
         super(MomentumFrankWolfe, self).__init__(params, defaults)
 
     @torch.no_grad()
-    def step(self, step=.1, momentum=.9, closure=None):
+    def step(self, closure=None):
         """Performs a single optimization step.
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
@@ -258,16 +262,18 @@ class MomentumFrankWolfe(Optimizer):
                     state['grad_estimate'] = torch.zeros_like(
                         p, memory_format=torch.preserve_format)
 
-                if step == 'sublinear':
+                if self.lr == 'sublinear':
                     step_size = 1. / (state['step'] + 1.)
-                elif type(step) == float:
-                    step_size = step
+                elif type(self.lr) == float:
+                    step_size = self.lr
                 else:
-                    raise ValueError("step must be float or 'sublinear'.")
+                    raise ValueError("lr must be float or 'sublinear'.")
 
-                if momentum is None:
+                if self.momentum is None:
                     rho = (1. / (state['step'] + 1)) ** (1/3)
                     momentum = 1. - rho
+                else:
+                    momentum = self.momentum
 
                 state['step'] += 1.
 

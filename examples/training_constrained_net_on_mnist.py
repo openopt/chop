@@ -28,16 +28,12 @@ test_loader = get_mnist_test_loader(batch_size=512, shuffle=True)
 model = LeNet5()
 model.to(device)
 
-# Initialize model at 0 weights
-for param in model.parameters():
-    param = torch.zeros_like(param)
-
 criterion = nn.CrossEntropyLoss()
 
 # Outer optimization parameters
 nb_epochs = 20
-step_size = .1
 momentum = .9
+step = .3
 
 # TODO: tune hyperparams for algorithms, and constraint sets
 # Choose optimizer here
@@ -49,7 +45,6 @@ constraint = constopt.constraints.LinfBall(alpha)
 # optimizer = constopt.stochastic.PGDMadry(model.parameters(), constraint)
 # optimizer = constopt.stochastic.FrankWolfe(model.parameters(), constraint)
 optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint)
-step = .3
 
 # Training loop
 for epoch in range(nb_epochs):

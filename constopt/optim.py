@@ -117,50 +117,57 @@ def minimize_three_split(
             return x
 
     x = x0.detach().clone().requires_grad_(True)
+    batch_size = x.size(0)
 
     if step is None:
         line_search = True
-        step = 1.0 / utils.init_lipschitz(closure, x)
+        step_size = 1.0 / utils.init_lipschitz(closure, x)
+
+    elif type(step) is float:
+        step_size = step * torch.ones(batch_size, device=x.device)
+
+    else:
+        raise ValueError("step must be float or None.")
 
     with torch.no_grad():
-        z = prox2(x, step, *args_prox)
+        z = prox2(x, step_size, *args_prox)
         z.requires_grad = True
 
-    fk, grad_fk = closure(z)
+    fval, grad = closure(z)
 
     with torch.no_grad():
-        x = prox1(z - utils.bmul(step, grad_fk), step, *args_prox)
+        x = prox1(z - utils.bmul(step_size, grad), step_size, *args_prox)
         u = torch.zeros_like(x)
 
     for it in range(max_iter):
         print(it)
-        fk, grad_fk = closure(z)
+        fval, grad = closure(z)
         with torch.no_grad():
-            x = prox1(z - utils.bmul(step, u + grad_fk), step, *args_prox)
+            x = prox1(z - utils.bmul(step_size, u + grad), step_size, *args_prox)
             incr = x - z
             norm_incr = torch.norm(incr.view(incr.size(0), -1), dim=-1)
-            rhs = fk + utils.bdot(grad_fk, incr) + ((norm_incr ** 2) / (2 * step))
-            ls_tol = closure(x, return_gradient=False)
+            rhs = f + utils.bdot(grad, incr) + ((norm_incr ** 2) / (2 * step_size))
+            ls_tol = closure(x, return_jac=False)
             mask = torch.bitwise_and(norm_incr > 1e-7, line_search)
             ls = mask.any()
             # TODO: optimize code in this loop using mask
             for it_ls in range(max_iter_backtracking):
-                rhs[mask] = fk[mask] + utils.bdot(grad_fk[mask], incr[mask]) + ((norm_incr ** 2) / (2 * step[mask]))
-                ls_tol[mask] = closure(x, return_gradient=False)[mask] - rhs[mask]
+                rhs[mask] = fk[mask] + utils.bdot(grad[mask], incr[mask]) + ((norm_incr ** 2) / (2 * step_size[mask]))
+                ls_tol[mask] = closure(x, return_jac=False)[mask] - rhs[mask]
                 mask &= (ls_tol <= LS_EPS)
-                step[mask] *= backtracking_factor
+                step_size[mask] *= backtracking_factor
 
-            z = prox2(x + utils.bmul(step, u), step, *args_prox).requires_grad_(True)
-            u += utils.bmul(x - z, 1. / step)
-            certificate = norm_incr / step
+            z = prox2(x + utils.bmul(step_size, u), step_size, *args_prox).requires_grad_(True)
+            u += utils.bmul(x - z, 1. / step_size)
+            certificate = norm_incr / step_size
 
             if ls and h_Lipschitz is not None:
                 if h_Lipschitz == 0:
-                    step = step * 1.02
+                    step_size = step_size * 1.02
                 else:
                     quot = h_Lipschitz ** 2
-                    tmp = torch.sqrt(step ** 2 + (2 * step / quot) * (-ls_tol))
-                    step = torch.min(tmp, step * 1.02)
+                    tmp = torch.sqrt(step_size ** 2 + (2 * step_size / quot) * (-ls_tol))
+                    step_size = torch.min(tmp, step_size * 1.02)
 
         if callback is not None:
             if callback(locals()) is False:
@@ -240,16 +247,16 @@ def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
     if step is None:
         # estimate lipschitz constant
         L = utils.init_lipschitz(closure, x0)
-        step = 1. / L
+        step_size = 1. / L
 
     if type(step) == float:
-        step = torch.ones(batch_size, device=x.device) * step
+        step_size = step * torch.ones(batch_size, device=x.device)
 
     for it in range(max_iter):
         x.requires_grad = True
         fval, grad = closure(x)
         with torch.no_grad():
-            x = prox(x - utils.bmul(step, grad), step, *prox_args)
+            x = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
 
         if callback is not None:
             if callback(locals()) is False:
