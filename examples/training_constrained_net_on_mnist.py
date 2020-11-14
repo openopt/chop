@@ -33,24 +33,19 @@ criterion = nn.CrossEntropyLoss()
 # Outer optimization parameters
 nb_epochs = 20
 momentum = .9
-step = .3
+lr = 0.3
 
 # Choose optimizer here
 # optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-# Make constraint
+# Make constraints
+
 alpha = 1.
 constraint = constopt.constraints.LinfBall(alpha)
-# constraint = constopt.constraints.L1Ball(alpha)
-# constraint = constopt.constraints.L2Ball(alpha)
 
 # Project model parameters in the constraint set.
 constraint.make_feasible(model)
 
-# optimizer = constopt.stochastic.PGD(model.parameters(), constraint)
-# optimizer = constopt.stochastic.PGDMadry(model.parameters(), constraint)
-# optimizer = constopt.stochastic.FrankWolfe(model.parameters(), constraint)
-optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint)
 
 # Training loop
 for epoch in range(nb_epochs):
