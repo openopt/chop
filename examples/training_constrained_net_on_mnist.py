@@ -21,16 +21,17 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 # Data Loaders
-train_loader = get_mnist_train_loader(batch_size=128, shuffle=True)
+train_loader = get_mnist_train_loader(batch_size=50, shuffle=True)
 test_loader = get_mnist_test_loader(batch_size=512, shuffle=True)
 
 # Model setup
 model = LeNet5()
 model.to(device)
 
-# Initialize at 0
+# Initialize model at 0 weights
 for param in model.parameters():
     param = torch.zeros_like(param)
+
 criterion = nn.CrossEntropyLoss()
 
 # Outer optimization parameters
@@ -44,11 +45,11 @@ momentum = .9
 alpha = 1.
 constraint = constopt.constraints.LinfBall(alpha)
 
-optimizer = constopt.stochastic.PGD(model.parameters(), constraint)
+# optimizer = constopt.stochastic.PGD(model.parameters(), constraint)
 # optimizer = constopt.stochastic.PGDMadry(model.parameters(), constraint)
 # optimizer = constopt.stochastic.FrankWolfe(model.parameters(), constraint)
-# optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint)
-
+optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint)
+step = .3
 
 # Training loop
 for epoch in range(nb_epochs):
