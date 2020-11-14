@@ -31,22 +31,22 @@ tol = 4e-3
 
 
 @pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
-                                       stochastic.FrankWolfe, stochastic.MomentumFrankWolfe])
-@pytest.mark.parametrize('step_size', [1., .5, .1, .05, .001, 0.])
-def test_L1Ball(algorithm, step_size):
+                                       stochastic.MomentumFrankWolfe])
+@pytest.mark.parametrize('lr', [1., .5, .1, .05, .001, 0.])
+def test_L1Ball(algorithm, lr):
     # Setup
     constraint = constopt.constraints.L1Ball(alpha)
     assert (constraint.prox(w) == w).all()
     w_t = Variable(torch.zeros_like(w), requires_grad=True)
 
-    optimizer = algorithm([w_t], constraint)
+    optimizer = algorithm([w_t], constraint, lr=lr)
     criterion = torch.nn.MSELoss(reduction='mean')
 
     # Logging
     store = Store(OUT_DIR)
-    store.add_table('metadata', {'algorithm': str, 'step-size': float})
+    store.add_table('metadata', {'algorithm': str, 'lr': float})
 
-    store['metadata'].append_row({'algorithm': optimizer.name, 'step-size': step_size})
+    store['metadata'].append_row({'algorithm': optimizer.name, 'lr': lr})
     store.add_table(optimizer.name, {'func_val': float, 'FW gap': float,
                                      'norm(w_t)': float})
     gap = torch.tensor(np.inf)
@@ -59,7 +59,7 @@ def test_L1Ball(algorithm, step_size):
         with torch.no_grad():
             gap = constraint.fw_gap(w_t.grad, w_t)
 
-        optimizer.step(step_size)
+        optimizer.step()
         store.log_table_and_tb(optimizer.name, {'func_val': loss.item(),
                                                 'FW gap': gap.item(),
                                                 'norm(w_t)': sum(abs(w_t)).item()
