@@ -50,13 +50,13 @@ if __name__ == "__main__":
     log_pgd_madry = partial(log, iterates=iterates_pgd_madry, losses=losses_pgd_madry)
 
     sol_pgd = minimize_pgd(loss_func, x_0, constraint.prox,
-                                 step=None,
+                                 step=1.,
                                  max_iter=iterations,
                                  callback=log_pgd)
 
     sol_pgd_madry = minimize_pgd_madry(loss_func, x_0, constraint.prox,
                                        constraint.lmo,
-                                       step=None,
+                                       step=2. * constraint.alpha / iterations,
                                        max_iter=iterations,
                                        callback=log_pgd_madry)
 

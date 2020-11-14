@@ -5,6 +5,7 @@ import torch
 from constopt import optim
 from constopt import utils
 from constopt import constraints
+from constopt import logging
 
 
 # Set up a batch of toy constrained optimization problems
@@ -20,18 +21,27 @@ def loss_fun(x):
 
 alpha = .5
 constraint = constraints.LinfBall(alpha)
+xstar = constraint.prox(xstar)
 
 
-def certificate(x, grad, prox):
+def certificate(kwargs):
+    x = kwargs['x']
+    prox = kwargs['prox']
+    grad = kwargs['grad']
     return torch.norm((x - prox(x - grad, 1.)).view(x.size(0), -1), dim=-1)
 
 
+trace_cb = logging.Trace(closure=loss_fun, callable=certificate)
+
+
 def test_minimize_pgd():
-    max_iter = 10
-    step_size = torch.ones(batch_size, dtype=float) * 2. * alpha / max_iter
+    max_iter = 100
     x0 = torch.zeros_like(xstar)
     sol = optim.minimize_pgd(loss_fun, x0, constraint.prox,
-                             step_size)
-
-    cert = certificate(sol.x, sol.grad, constraint.prox)
-    assert cert.allclose(torch.zeros(batch_size, dtype=torch.double)), cert
+                             step=1.,
+                             max_iter=max_iter, callback=trace_cb)
+    x = sol.x
+    grad = sol.grad
+    prox = constraint.prox
+    cert = certificate(locals())
+    assert cert.allclose(torch.zeros(batch_size, dtype=torch.float)), cert

@@ -1,4 +1,4 @@
-from constopt.optim import minimize_pgd, minimize_pgd_madry
+from constopt.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
 from constopt.utils import closure
 
 import torch
@@ -32,6 +32,7 @@ print(f"Evaluating model {model_name} on L{constraint.p} ball({alpha}).")
 n_correct = 0
 n_correct_adv_pgd_madry = 0
 n_correct_adv_pgd = 0
+n_correct_adv_split = 0
 
 for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     data = data.to(device)
@@ -52,6 +53,8 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
 
     adversary_pgd = Adversary(minimize_pgd)
     adversary_pgd_madry = Adversary(minimize_pgd_madry)
+    adversary_split = Adversary(minimize_three_split)
+    adversary_fw = Adversary(minimize_frank_wolfe)
 
     _, delta_pgd = adversary_pgd.perturb(data, target, model, criterion,
                                          use_best=False,
@@ -63,8 +66,22 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
                                                      use_best=False,
                                                      prox=prox,
                                                      lmo=constraint.lmo,
-                                                     step=2 * constraint.alpha / max_iter, 
+                                                     step=2 * constraint.alpha / max_iter,
                                                      max_iter=max_iter)
+
+    delta_split = torch.zeros_like(data, device=data.device)
+    # _, delta_split = adversary_split.perturb(data, target, model,
+    #                                          criterion,
+    #                                          use_best=False,
+    #                                          prox1=constraint.prox,
+    #                                          prox2=image_constraint_prox,
+    #                                          max_iter=max_iter)
+
+    # _, delta_fw = adversary_fw.perturb(data, target, model, criterion,
+    #                                    lmo=constraint.lmo,
+    #                                    step='sublinear',
+    #                                    max_iter=max_iter
+    #                                    )
 
     label = torch.argmax(model(data), dim=-1)
     n_correct += (label == target).sum().item()
@@ -75,11 +92,15 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     adv_label_pgd = torch.argmax(model(data + delta_pgd), dim=-1)
     n_correct_adv_pgd += (adv_label_pgd == target).sum().item()
 
+    adv_label_split = torch.argmax(model(data + delta_split), dim=-1)
+    n_correct_adv_split += (adv_label_split == target).sum().item()
 
 accuracy = n_correct / n_examples
 accuracy_adv_pgd_madry = n_correct_adv_pgd_madry / n_examples
 accuracy_adv_pgd = n_correct_adv_pgd / n_examples
+accuracy_adv_split = n_correct_adv_split / n_examples
 
 print(f"Accuracy: {accuracy:.4f}")
-print(f"RobustAccuracy: {accuracy_adv_pgd_madry:.4f}")
-print(f"RobustAccuracy: {accuracy_adv_pgd:.4f}")
+print(f"RobustAccuracy PGD Madry: {accuracy_adv_pgd_madry:.4f}")
+print(f"RobustAccuracy PGD: {accuracy_adv_pgd:.4f}")
+print(f"RobustAccuracy Splitting: {accuracy_adv_split:.4f}")
