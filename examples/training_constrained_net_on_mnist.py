@@ -35,11 +35,17 @@ nb_epochs = 20
 momentum = .9
 step = .3
 
-# TODO: tune hyperparams for algorithms, and constraint sets
 # Choose optimizer here
 # optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+# Make constraint
 alpha = 1.
 constraint = constopt.constraints.LinfBall(alpha)
+# constraint = constopt.constraints.L1Ball(alpha)
+# constraint = constopt.constraints.L2Ball(alpha)
+
+# Project model parameters in the constraint set.
+constraint.make_feasible(model)
 
 # optimizer = constopt.stochastic.PGD(model.parameters(), constraint)
 # optimizer = constopt.stochastic.PGDMadry(model.parameters(), constraint)

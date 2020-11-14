@@ -12,6 +12,7 @@ from torch.distributions import Laplace, Normal
 the COPT project, https://github.com/openopt/copt."""
 
 
+@torch.no_grad()
 def euclidean_proj_simplex(v, s=1.):
     r""" Compute the Euclidean projection on a positive simplex
   Solves the optimization problem (using the algorithm from [1]):
@@ -55,6 +56,7 @@ def euclidean_proj_simplex(v, s=1.):
     return w
 
 
+@torch.no_grad()
 def euclidean_proj_l1ball(v, s=1.):
     """ Compute the Euclidean projection on a L1-ball
   Solves the optimization problem (using the algorithm from [1]):
@@ -100,10 +102,12 @@ class LpBall:
         self.alpha = alpha
         self.active_set = defaultdict(float)
 
+    @torch.no_grad()
     def fw_gap(self, grad, iterate):
         update_direction, _ = self.lmo(-grad, iterate)
         return (-grad * update_direction).sum()
 
+    @torch.no_grad()
     def random_point(self, shape):
         """
         Sample uniformly from the constraint set.
@@ -138,24 +142,35 @@ class LpBall:
         ret.alpha /= other
         return ret
 
+    @torch.no_grad()
+    def make_feasible(self, model):
+        """Projects all parameters of model into the constraint set."""
+
+        for idx, (name, param) in enumerate(model.named_parameters()):
+            param.copy_(self.prox(param))
+
 
 class LinfBall(LpBall):
     p = np.inf
 
+    @torch.no_grad()
     def prox(self, x, step_size=None):
         if torch.max(abs(x)) <= self.alpha:
             return x
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
+    @torch.no_grad()
     def lmo(self, grad, iterate):
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
+    @torch.no_grad()
     def random_point(self, shape):
         """Returns a point of given shape uniformly at random from the constraint set."""
         return self.alpha * torch.FloatTensor(*shape).uniform_(-1, 1)
 
+    @torch.no_grad()
     def lmo_pairwise(self, grad, iterate, active_set):
         fw_direction = self.lmo(grad, iterate) + iterate.clone().detach()
 
@@ -169,68 +184,56 @@ class LinfBall(LpBall):
 class L1Ball(LpBall):
     p = 1
 
-    def lmo(self, grad, iterate, batch=False):
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
         """Returns s-x, s solving the linear problem
         max_{\|s\|_1 <= \\alpha} \\langle grad, s\\rangle
         """
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
-        if batch:
-            batch_size = iterate.size(0)
-            flatten_abs_grad = abs_grad.view(batch_size, -1)
-            flatten_largest_mask = (flatten_abs_grad == flatten_abs_grad.max(-1, True)[0])
-            largest = torch.where(flatten_largest_mask.view_as(abs_grad))
-        else:
-            largest = torch.where(abs_grad == abs_grad.max())
+        batch_size = iterate.size(0)
+        flatten_abs_grad = abs_grad.view(batch_size, -1)
+        flatten_largest_mask = (flatten_abs_grad == flatten_abs_grad.max(-1, True)[0])
+        largest = torch.where(flatten_largest_mask.view_as(abs_grad))
 
         update_direction[largest] += self.alpha * torch.sign(
             grad[largest])
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
-    def prox(self, x, step_size=None, batch=False):
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
         shape = x.shape
-        if batch:
-            flattened_x = x.view(shape[0], -1)
-            projected = [self.prox(row.view(-1), step_size, batch=False)
-                         for row in flattened_x]
-            x = torch.stack(projected)
-        else:
-            x = euclidean_proj_l1ball(x.view(-1), self.alpha)
+        flattened_x = x.view(shape[0], -1)
+        projected = [self.prox(row.view(-1), step_size, batch=False)
+                        for row in flattened_x]
+        x = torch.stack(projected)
         return x.view(*shape)
 
 
-# TODO: #1 Fix L2 Ball
 class L2Ball(LpBall):
     p = 2
 
-    def prox(self, x, step_size=None, batch=False):
-        if batch:
-            shape = x.shape
-            norms = torch.norm(x.view(shape[0], -1), p=2, dim=-1)
-            mask = norms > self.alpha
-            projected = x.clone().detach()
-            projected[mask] = (projected[mask].T / norms[mask]).T
-            return self.alpha * projected.view(shape)
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
+        shape = x.shape
+        norms = torch.norm(x.view(shape[0], -1), p=2, dim=-1)
+        mask = norms > self.alpha
+        projected = x.clone().detach()
+        projected[mask] = (projected[mask].T / norms[mask]).T
+        return self.alpha * projected.view(shape)
 
-        norm = torch.sqrt((x ** 2).sum())
-        if norm <= self.alpha:
-            return x
-        return self.alpha * x / norm
 
-    def lmo(self, grad, iterate, batch=False):
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
         """
         Returns s-x, s solving the linear problem
         max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
         """
         update_direction = iterate.clone().detach()
-        if batch:
-            grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
-            update_direction += self.alpha * (grad.view(grad.size(0), -1).T
-                                              / grad_norms).T.view_as(iterate)
-        else:
-            grad_norm = torch.sqrt((grad ** 2).sum())
-            update_direction += self.alpha * grad / grad_norm
+        grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
+        update_direction += self.alpha * (grad.view(grad.size(0), -1).T
+                                            / grad_norms).T.view_as(iterate)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
 
@@ -248,11 +251,13 @@ def make_LpBall(alpha, p=1):
 
 class Simplex:
 
+    @torch.no_grad()
     def prox(self, x, step_size=None):
         shape = x.shape
         x = euclidean_proj_simplex(x.view(-1), self.alpha)
         return x.view(*shape)
 
+    @torch.no_grad()
     def lmo(self, grad, iterate):
         largest_coordinate = torch.where(grad == grad.max())
 

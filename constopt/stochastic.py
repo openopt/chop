@@ -90,7 +90,7 @@ class PGD(Optimizer):
     name = 'PGD'
 
     def __init__(self, params, constraint, lr=.1):
-        self.prox = constraint.prox
+        self.prox = lambda x: constraint.prox(x.unsqueeze(0)).squeeze()
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
         self.lr = lr
@@ -122,7 +122,7 @@ class PGD(Optimizer):
                 else:
                     step_size = self.lr
 
-                p.add_(self.prox(p - step_size * grad) - p)
+                p.copy_(self.prox(p - step_size * grad))
         return loss
 
 
@@ -131,8 +131,13 @@ class PGDMadry(Optimizer):
     name = 'PGD-Madry'
 
     def __init__(self, params, constraint, lr):
-        self.prox = constraint.prox
-        self.lmo = constraint.lmo
+        self.prox = lambda x: constraint.prox(x.unsqueeze(0)).squeeze()
+
+        def _lmo(u, x):
+            update_direction, max_step_size = constraint.lmo(u.unsqueeze(0), x.unsqueeze(0))
+            return update_direction.squeeze(dim=0), max_step_size
+        self.lmo = _lmo
+
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
         self.lr = lr
@@ -165,7 +170,7 @@ class PGDMadry(Optimizer):
                     step_size = self.lr
                 lmo_res, _ = self.lmo(-p.grad, p)
                 normalized_grad = lmo_res + p
-                p.add_(self.prox(p + step_size * normalized_grad) - p)
+                p.copy_(self.prox(p + step_size * normalized_grad))
         return loss
 
 
@@ -176,7 +181,11 @@ class PairwiseFrankWolfe(Optimizer):
     def __init__(self, params, constraint, lr=.1, momentum=.9):
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
-        self.lmo = constraint.lmo_pairwise
+
+        def _lmo(u, x):
+            update_direction, max_step_size = constraint.lmo_pairwise(u.unsqueeze(0), x.unsqueeze(0))
+            return update_direction.squeeze(dim=0), max_step_size
+        self.lmo = _lmo
         self.lr = lr
         self.momentum = momentum
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
@@ -191,8 +200,17 @@ class MomentumFrankWolfe(Optimizer):
     name = 'Momentum-FW'
 
     def __init__(self, params, constraint, lr=.1, momentum=.9):
-        self.lmo = constraint.lmo
+        def _lmo(u, x):
+            update_direction, max_step_size = constraint.lmo(u.unsqueeze(0), x.unsqueeze(0))
+            return update_direction.squeeze(dim=0), max_step_size
+        self.lmo = _lmo
+
+        if type(lr) == float:
+            if not (0. <= lr <= 1.):
+                raise ValueError("lr must be in [0., 1.].")
         self.lr = lr
+        if not(0. <= momentum <= 1.):
+            raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
         super(MomentumFrankWolfe, self).__init__(params, defaults)
