@@ -46,6 +46,7 @@ constraint = constopt.constraints.LinfBall(alpha)
 # Project model parameters in the constraint set.
 constraint.make_feasible(model)
 
+optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint, lr=.3)
 
 # Training loop
 for epoch in range(nb_epochs):
