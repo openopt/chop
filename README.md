@@ -1,5 +1,8 @@
 # ConstOpt-PyTorch: a library for constrained optimization built on PyTorch
  ...with applications to adversarially attacking and training neural networks.
+ 
+[![Build Status](https://travis-ci.org/openopt/constopt-pytorch.svg?branch=master)](https://travis-ci.org/openopt/constopt-pytorch)
+
 
 ## Stochastic Constrained Algorithms
 We define stochastic optimizers in the `constopt.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
