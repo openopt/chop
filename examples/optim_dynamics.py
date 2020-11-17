@@ -3,9 +3,9 @@ from functools import partial
 import matplotlib.pyplot as plt
 import torch
 
-from constopt.constraints import LinfBall
-from constopt.optim import minimize_pgd, minimize_pgd_madry
-from constopt import utils
+from chop.constraints import LinfBall
+from chop.optim import minimize_pgd, minimize_pgd_madry
+from chop import utils
 
 torch.random.manual_seed(0)
 
@@ -34,6 +34,7 @@ def log(kwargs, iterates, losses):
     iterates.append(x)
     val = kwargs['closure'](x, return_jac=False).data
     losses.append(val)
+
 
 
 if __name__ == "__main__":

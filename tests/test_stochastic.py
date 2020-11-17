@@ -7,8 +7,8 @@ import pytest
 import shutil
 from cox.store import Store
 
-import constopt
-from constopt import stochastic
+import chop
+from chop import stochastic
 
 
 OUT_DIR = "logging/tests/test_optim"
@@ -35,7 +35,7 @@ tol = 4e-3
 @pytest.mark.parametrize('lr', [1., .5, .1, .05, .001, 0.])
 def test_L1Ball(algorithm, lr):
     # Setup
-    constraint = constopt.constraints.L1Ball(alpha)
+    constraint = chop.constraints.L1Ball(alpha)
     assert (constraint.prox(w) == w).all()
     w_t = Variable(torch.zeros_like(w), requires_grad=True)
 

@@ -8,7 +8,7 @@ and will perform the optimization point-wise over the batch."""
 import torch
 import numpy as np
 from scipy import optimize
-from constopt import utils
+from chop import utils
 
 
 def minimize_three_split(

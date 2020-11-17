@@ -12,7 +12,7 @@ from advertorch.test_utils import LeNet5
 from advertorch_examples.utils import get_mnist_train_loader
 from advertorch_examples.utils import get_mnist_test_loader
 
-import constopt
+import chop
 
 # Setup
 torch.manual_seed(0)
@@ -41,12 +41,12 @@ lr = 0.3
 # Make constraints
 
 alpha = 1.
-constraint = constopt.constraints.LinfBall(alpha)
+constraint = chop.constraints.LinfBall(alpha)
 
 # Project model parameters in the constraint set.
 constraint.make_feasible(model)
 
-optimizer = constopt.stochastic.MomentumFrankWolfe(model.parameters(), constraint, lr=.3)
+optimizer = chop.stochastic.MomentumFrankWolfe(model.parameters(), constraint, lr=.3)
 
 # Training loop
 for epoch in range(nb_epochs):

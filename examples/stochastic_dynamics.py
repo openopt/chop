@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from constopt.constraints import LinfBall
-from constopt.stochastic import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
+from chop.constraints import LinfBall
+from chop.stochastic import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
 
 torch.random.manual_seed(0)
 

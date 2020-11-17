@@ -1,9 +1,9 @@
 """Tests for utility functions"""
 
-from constopt.utils import closure
+from chop.utils import closure
 import torch
 from torch import nn
-from constopt import utils
+from chop import utils
 
 
 # Set up random regression problem

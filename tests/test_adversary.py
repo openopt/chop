@@ -6,9 +6,9 @@ from torch import nn
 
 import numpy as np
 
-import constopt
-from constopt import optim
-from constopt.adversary import Adversary
+import chop
+from chop import optim
+from chop.adversary import Adversary
 
 
 class LinearModel(nn.Module):
@@ -42,7 +42,7 @@ def test_adversary_synthetic_data(algorithm, step_size, p):
     model = LinearModel()
     model.to(device)
     criterion = nn.CrossEntropyLoss()
-    constraint = constopt.constraints.make_LpBall(alpha=1., p=p)
+    constraint = chop.constraints.make_LpBall(alpha=1., p=p)
 
     adv = Adversary(algorithm)
 
@@ -102,7 +102,7 @@ def test_adversary_mnist(algorithm, step, p, model_filename):
     model.eval()
 
     criterion = nn.CrossEntropyLoss()
-    constraint = constopt.constraints.make_LpBall(alpha=1., p=p)
+    constraint = chop.constraints.make_LpBall(alpha=1., p=p)
 
     test_loader = get_mnist_test_loader(batch_size=1, shuffle=True)
     # Just get first batch

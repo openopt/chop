@@ -1,18 +1,18 @@
-# ConstOpt-PyTorch: a library for constrained optimization built on PyTorch
+# pytorCH OPtimize: a library for continuous optimization built on PyTorch
  ...with applications to adversarially attacking and training neural networks.
  
-[![Build Status](https://travis-ci.org/openopt/constopt-pytorch.svg?branch=master)](https://travis-ci.org/openopt/constopt-pytorch)
+[![Build Status](https://travis-ci.org/openopt/chop.svg?branch=master)](https://travis-ci.org/openopt/chop)
 
 
 ## Stochastic Constrained Algorithms
-We define stochastic optimizers in the `constopt.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
+We define stochastic optimizers in the `chop.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
 
 ### Examples:
 - `examples/training_constrained_net_on_mnist.py` for a model training use case.
 
 ## Full Gradient Constrained Algorithms
 
-We also define full-gradient constrained algorithms which operate on a batch of optimization problems in the `constopt.optim` module. These are used for adversarial attacks, using the `constopt.Adversary` wrapper.
+We also define full-gradient constrained algorithms which operate on a batch of optimization problems in the `chop.optim` module. These are used for adversarial attacks, using the `chop.Adversary` wrapper.
 
 ### Examples:
 
@@ -27,10 +27,10 @@ Run the tests with `pytests tests`.
 
 If this software is useful to your research, please consider citing
 ```
-@article{constopt-pytorch,
+@article{chop,
   author       = {Geoffrey Negiar, Fabian Pedregosa},
-  title        = {constopt-pytorch: constrained optimization based on Pytorch},
+  title        = {CHOP: continuous optimization built on Pytorch},
   year         = 2020,
-  url          = {http://github.com/openopt/constopt-pytorch}
+  url          = {http://github.com/openopt/chop}
 }
 ```

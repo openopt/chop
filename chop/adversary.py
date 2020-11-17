@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from constopt import utils
+from chop import utils
 
 
 class Adversary:

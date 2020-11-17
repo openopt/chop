@@ -1,4 +1,4 @@
-name: constopt
+name: chop
 channels:
  - pytorch
 dependencies:

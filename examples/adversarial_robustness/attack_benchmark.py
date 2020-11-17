@@ -1,12 +1,12 @@
-from constopt.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
-from constopt.utils import closure
+from chop.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
+from chop.utils import closure
 
 import torch
 from tqdm import tqdm
 
-import constopt as cpt
-from constopt.data import load_cifar10
-from constopt.adversary import Adversary
+import chop
+from chop.data import load_cifar10
+from chop.adversary import Adversary
 
 from robustbench.utils import load_model
 
@@ -24,7 +24,7 @@ criterion = torch.nn.CrossEntropyLoss(reduction='none')
 # Define the perturbation constraint set
 max_iter = 20
 alpha = 8 / 255.
-constraint = cpt.constraints.LinfBall(alpha)
+constraint = chop.constraints.LinfBall(alpha)
 
 
 print(f"Evaluating model {model_name} on L{constraint.p} ball({alpha}).")

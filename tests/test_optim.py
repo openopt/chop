@@ -1,11 +1,11 @@
-"""Tests full gradient batch-wise optimization algorithms from constopt.optim"""
+"""Tests full gradient batch-wise optimization algorithms from chop.optim"""
 
 
 import torch
-from constopt import optim
-from constopt import utils
-from constopt import constraints
-from constopt import logging
+from chop import optim
+from chop import utils
+from chop import constraints
+from chop import logging
 
 
 # Set up a batch of toy constrained optimization problems

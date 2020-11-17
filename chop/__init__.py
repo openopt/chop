@@ -1,4 +1,4 @@
-"""Constopt: constrained optimization for PyTorch"""
+"""chop: constrained optimization for PyTorch"""
 __version__ = "0.0.1"
 
 from . import stochastic

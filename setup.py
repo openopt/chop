@@ -15,14 +15,14 @@ Operating System :: Unix
 """
 
 setup(
-    name="constopt-pytorch",
-    description="Library for constrained optimization using PyTorch",
+    name="chop",
+    description="Library for continuous optimization using PyTorch",
     long_description=io.open("README.md", encoding="utf-8").read(),
     version="0.0.1",
     author="Geoffrey Negiar",
     author_email="geoffrey_negiar@berkeley.edu",
-    url="http://pypi.python.org/pypi/constopt-pytorch",
-    packages=["constopt"],
+    url="http://pypi.python.org/pypi/chop-pytorch",
+    packages=["chop"],
     install_requires=["numpy", "scipy", "torch"],
     classifiers=[_f for _f in CLASSIFIERS.split("\n") if _f],
     license="New BSD License",
