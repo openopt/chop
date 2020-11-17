@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 
 from chop.constraints import LinfBall
-from chop.optim import minimize_pgd, minimize_pgd_madry
+from chop.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
 from chop import utils
 
 torch.random.manual_seed(0)
@@ -44,11 +44,18 @@ if __name__ == "__main__":
 
     iterates_pgd = [x_0.squeeze().data]
     iterates_pgd_madry = [x_0.squeeze().data]
+    iterates_splitting = [x_0.squeeze().data]
+    iterates_fw = [x_0.squeeze().data]
+
     losses_pgd = [loss_func(x_0, return_jac=False).data]
     losses_pgd_madry = [loss_func(x_0, return_jac=False).data]
+    losses_splitting = [loss_func(x_0, return_jac=False).data]
+    losses_fw = [loss_func(x_0, return_jac=False).data]
 
     log_pgd = partial(log, iterates=iterates_pgd, losses=losses_pgd)
     log_pgd_madry = partial(log, iterates=iterates_pgd_madry, losses=losses_pgd_madry)
+    log_splitting = partial(log, iterates=iterates_splitting, losses=losses_splitting)
+    log_fw = partial(log, iterates=iterates_fw, losses=losses_fw)
 
     sol_pgd = minimize_pgd(loss_func, x_0, constraint.prox,
                                  step=1.,
@@ -61,13 +68,21 @@ if __name__ == "__main__":
                                        max_iter=iterations,
                                        callback=log_pgd_madry)
 
+    sol_splitting = minimize_three_split(loss_func, x_0, prox1=constraint.prox, 
+                                         max_iter=iterations, callback=log_splitting)
+
+    sol_fw = minimize_frank_wolfe(loss_func, x_0, constraint.lmo, callback=log_fw)
+
     fig, ax = plt.subplots()
     ax.plot(losses_pgd, label="PGD")
     ax.plot(losses_pgd_madry, label="PGD Madry")
+    ax.plot(losses_splitting, label="Operator Splitting")
+    ax.plot(losses_fw, label="Frank-Wolfe")
     fig.legend()
     fig.savefig("examples/plots/optim/2-D_Linf_losses.png")
 
-    fig, ax = plt.subplots(figsize=(8, 4), ncols=2, sharex=True, sharey=True)
+    fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True)
+    ax = ax.flatten()
     ax[0].plot(*zip(*iterates_pgd), '-o', label="PGD", alpha=.6)
     ax[0].set_xlim(-1, 1)
     ax[0].set_ylim(-1, 1)
@@ -77,5 +92,15 @@ if __name__ == "__main__":
     ax[1].set_xlim(-1, 1)
     ax[1].set_ylim(-1, 1)
     ax[1].legend()
+
+    ax[2].plot(*zip(*iterates_splitting), '-o', label="Operator Splitting", alpha=.6)
+    ax[2].set_xlim(-1, 1)
+    ax[2].set_ylim(-1, 1)
+    ax[2].legend()
+
+    ax[3].plot(*zip(*iterates_fw), '-o', label="Frank-Wolfe", alpha=.6)
+    ax[3].set_xlim(-1, 1)
+    ax[3].set_ylim(-1, 1)
+    ax[3].legend()
 
     fig.savefig("examples/plots/optim/2-D_Linf_iterates.png")

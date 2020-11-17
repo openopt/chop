@@ -27,6 +27,8 @@ def closure(f):
         instead of just value."""
         if not return_jac:
             val = f(x, *args, **kwargs)
+            if val.ndim == 0:
+                val = torch.tensor([val])
             return val
 
         x.grad = None

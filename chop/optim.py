@@ -297,7 +297,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
         raise ValueError("step must be a float or 'sublinear'.")
 
     if type(step) == float:
-        step_size = torch.ones(batch_size, device=x.device, dtype=x.dtype) * step
+        step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
 
     for it in range(max_iter):
 
@@ -309,7 +309,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
             step_size = 2. / (it + 2) * torch.ones(batch_size, dtype=x.dtype, device=x.device)
 
         with torch.no_grad():
-            step_size = torch.max(step_size, max_step_size)
+            step_size = torch.min(step_size, max_step_size)
             x += utils.bmul(update_direction, step_size)
 
         if callback is not None:

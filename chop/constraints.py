@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
-# TODO: Add projections to the constraints, and write ProjectedOptimizer wrapper/decorator
+from chop import utils
 
 """This uses an API similar to the one for
 the COPT project, https://github.com/openopt/copt.
@@ -151,7 +151,7 @@ class LpBall:
     @torch.no_grad()
     def fw_gap(self, grad, iterate):
         update_direction, _ = self.lmo(-grad, iterate)
-        return (-grad * update_direction).sum()
+        return utils.bdot(-grad, update_direction)
 
     @torch.no_grad()
     def random_point(self, shape):
