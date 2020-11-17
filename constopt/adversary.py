@@ -35,8 +35,8 @@ class Adversary:
                 self.best_loss = -np.inf * torch.ones(batch_size, device=device)
 
             def __call__(self, kwargs):
-                mask = (kwargs['fval'] < self.best_loss)
-                self.best_loss[mask] = kwargs['fval'][mask]
+                mask = (-kwargs['fval'] > self.best_loss)
+                self.best_loss[mask] = -kwargs['fval'][mask]
                 self.best[mask] = kwargs['x'][mask].detach().clone()
 
                 if callback is not None:
@@ -50,6 +50,6 @@ class Adversary:
                           **optimizer_kwargs)
 
         if use_best:
-            return -cb.best_loss, cb.best
+            return cb.best_loss, cb.best
 
-        return sol.fval, sol.x
+        return -sol.fval, sol.x

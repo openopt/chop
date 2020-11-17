@@ -33,6 +33,7 @@ n_correct = 0
 n_correct_adv_pgd_madry = 0
 n_correct_adv_pgd = 0
 n_correct_adv_split = 0
+n_correct_adv_fw = 0
 
 for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     data = data.to(device)
@@ -66,7 +67,7 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
                                                      use_best=False,
                                                      prox=prox,
                                                      lmo=constraint.lmo,
-                                                     step=2 * constraint.alpha / max_iter,
+                                                     step=2. / max_iter,
                                                      max_iter=max_iter)
 
     delta_split = torch.zeros_like(data, device=data.device)
@@ -95,12 +96,18 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     adv_label_split = torch.argmax(model(data + delta_split), dim=-1)
     n_correct_adv_split += (adv_label_split == target).sum().item()
 
+    adv_label_fw = torch.argmax(model(data + delta_fw), dim=-1)
+    n_correct_adv_fw += (adv_label_fw == target).sum().item()
+
+
 accuracy = n_correct / n_examples
 accuracy_adv_pgd_madry = n_correct_adv_pgd_madry / n_examples
 accuracy_adv_pgd = n_correct_adv_pgd / n_examples
 accuracy_adv_split = n_correct_adv_split / n_examples
+accuracy_adv_fw = n_correct_adv_fw / n_examples
 
 print(f"Accuracy: {accuracy:.4f}")
 print(f"RobustAccuracy PGD Madry: {accuracy_adv_pgd_madry:.4f}")
 print(f"RobustAccuracy PGD: {accuracy_adv_pgd:.4f}")
 print(f"RobustAccuracy Splitting: {accuracy_adv_split:.4f}")
+print(f"RobustAccuracy FW: {accuracy_adv_fw:.4f}")
