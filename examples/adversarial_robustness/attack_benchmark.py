@@ -70,18 +70,18 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
                                                      max_iter=max_iter)
 
     delta_split = torch.zeros_like(data, device=data.device)
-    # _, delta_split = adversary_split.perturb(data, target, model,
-    #                                          criterion,
-    #                                          use_best=False,
-    #                                          prox1=constraint.prox,
-    #                                          prox2=image_constraint_prox,
-    #                                          max_iter=max_iter)
+    _, delta_split = adversary_split.perturb(data, target, model,
+                                             criterion,
+                                             use_best=False,
+                                             prox1=constraint.prox,
+                                             prox2=image_constraint_prox,
+                                             max_iter=max_iter)
 
-    # _, delta_fw = adversary_fw.perturb(data, target, model, criterion,
-    #                                    lmo=constraint.lmo,
-    #                                    step='sublinear',
-    #                                    max_iter=max_iter
-    #                                    )
+    _, delta_fw = adversary_fw.perturb(data, target, model, criterion,
+                                       lmo=constraint.lmo,
+                                       step='sublinear',
+                                       max_iter=max_iter
+                                       )
 
     label = torch.argmax(model(data), dim=-1)
     n_correct += (label == target).sum().item()

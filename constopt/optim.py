@@ -25,9 +25,8 @@ def minimize_three_split(
     max_iter_backtracking=100,
     backtracking_factor=0.7,
     h_Lipschitz=None,
-    *args_prox,
-    **kwargs_prox
-):
+    *args_prox
+    ):
 
     """Davis-Yin three operator splitting method.
     This algorithm can solve problems of the form
@@ -108,11 +107,12 @@ def minimize_three_split(
 
     if prox1 is None:
 
+        @torch.no_grad()
         def prox1(x, s=None, *args):
             return x
 
     if prox2 is None:
-
+        @torch.no_grad()
         def prox2(x, s=None, *args):
             return x
 
@@ -129,45 +129,40 @@ def minimize_three_split(
     else:
         raise ValueError("step must be float or None.")
 
-    with torch.no_grad():
-        z = prox2(x, step_size, *args_prox)
-        z.requires_grad = True
+    z = prox2(x, step_size, *args_prox)
+    z = z.clone().detach()
+    z.requires_grad_(True)
 
     fval, grad = closure(z)
 
-    with torch.no_grad():
-        x = prox1(z - utils.bmul(step_size, grad), step_size, *args_prox)
-        u = torch.zeros_like(x)
+    x = prox1(z - utils.bmul(step_size, grad), step_size, *args_prox)
+    u = torch.zeros_like(x)
 
     for it in range(max_iter):
-        print(it)
+        z.requires_grad_(True)
         fval, grad = closure(z)
         with torch.no_grad():
             x = prox1(z - utils.bmul(step_size, u + grad), step_size, *args_prox)
             incr = x - z
             norm_incr = torch.norm(incr.view(incr.size(0), -1), dim=-1)
-            rhs = f + utils.bdot(grad, incr) + ((norm_incr ** 2) / (2 * step_size))
+            rhs = fval + utils.bdot(grad, incr) + ((norm_incr ** 2) / (2 * step_size))
             ls_tol = closure(x, return_jac=False)
             mask = torch.bitwise_and(norm_incr > 1e-7, line_search)
-            ls = mask.any()
+            ls = mask.detach().clone()
             # TODO: optimize code in this loop using mask
             for it_ls in range(max_iter_backtracking):
-                rhs[mask] = fk[mask] + utils.bdot(grad[mask], incr[mask]) + ((norm_incr ** 2) / (2 * step_size[mask]))
+                if not(mask.any()):
+                    break
+                rhs[mask] = fval[mask] + utils.bdot(grad[mask], incr[mask])
+                rhs[mask] += utils.bmul(norm_incr[mask] ** 2, 1. / (2 * step_size[mask]))
+
                 ls_tol[mask] = closure(x, return_jac=False)[mask] - rhs[mask]
-                mask &= (ls_tol <= LS_EPS)
+                mask &= (ls_tol > LS_EPS)
                 step_size[mask] *= backtracking_factor
 
-            z = prox2(x + utils.bmul(step_size, u), step_size, *args_prox).requires_grad_(True)
+            z = prox2(x + utils.bmul(step_size, u), step_size, *args_prox)
             u += utils.bmul(x - z, 1. / step_size)
-            certificate = norm_incr / step_size
-
-            if ls and h_Lipschitz is not None:
-                if h_Lipschitz == 0:
-                    step_size = step_size * 1.02
-                else:
-                    quot = h_Lipschitz ** 2
-                    tmp = torch.sqrt(step_size ** 2 + (2 * step_size / quot) * (-ls_tol))
-                    step_size = torch.min(tmp, step_size * 1.02)
+            certificate = utils.bmul(norm_incr, 1. / step_size)
 
         if callback is not None:
             if callback(locals()) is False:
@@ -177,7 +172,7 @@ def minimize_three_split(
         if success.all():
             break
 
-    return optimize.OptimizeResult(x=x, success=success, nit=it)
+    return optimize.OptimizeResult(x=x, success=success, nit=it, fval=fval)
 
 
 def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_args=(), callback=None):
