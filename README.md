@@ -3,6 +3,7 @@
  
 [![Build Status](https://travis-ci.org/openopt/chop.svg?branch=master)](https://travis-ci.org/openopt/chop)
 
+!! WARNING !! This library is in early development. Its API may change often for the time being.
 
 ## Stochastic Constrained Algorithms
 We define stochastic optimizers in the `chop.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
