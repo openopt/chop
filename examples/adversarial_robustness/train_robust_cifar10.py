@@ -11,13 +11,12 @@ from torchvision import models
 device = torch.device('cuda' if torch.cuda.is_available()
                       else 'cpu')
 
-n_epochs = 50
+n_epochs = 128
 batch_size = 100
-n_examples = 10000
 
 trainloader = chop.data.load_cifar10(batch_size=batch_size,
-                                train=True,
-                                data_dir='~/datasets')
+                                     train=True,
+                                     data_dir='~/datasets')
 testloader = chop.data.load_cifar10(batch_size=batch_size,
                                     data_dir='~/datasets')
 
@@ -26,7 +25,7 @@ model.to(device)
 
 criterion = torch.nn.CrossEntropyLoss()
 
-optimizer = SGD(model.parameters(), lr=1e-3, momentum=.9)
+optimizer = SGD(model.parameters(), lr=.1, momentum=.9, weight_decay=5e-4)
 
 # Define the perturbation constraint set
 max_iter_train = 7
@@ -126,5 +125,5 @@ for _ in range(n_epochs):
             n_correct += (pred == target).sum().item()
             n_correct_adv += (pred_adv == target).sum().item()
 
-    print(f"Test Accuracy: {n_correct / 50000.}")
-    print(f"Test Adv Accuracy: {n_correct_adv / 50000.}")
+    print(f"Test Accuracy: {n_correct / 10000.}")
+    print(f"Test Adv Accuracy: {n_correct_adv / 10000.}")
