@@ -1,5 +1,4 @@
 [![Build Status](https://travis-ci.org/openopt/chop.svg?branch=master)](https://travis-ci.org/openopt/chop)
-
 # pytorCH OPtimize: a library for continuous optimization built on PyTorch
  ...with applications to adversarially attacking and training neural networks.
  
