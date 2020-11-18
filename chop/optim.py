@@ -247,18 +247,28 @@ def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
     if type(step) == float:
         step_size = step * torch.ones(batch_size, device=x.device)
 
+    def certificate(x, grad, step_size):
+        return torch.norm((x - prox(x - utils.bmul(step_size, grad),
+                                    step_size)
+                           ).view(x.size(0), -1),
+                          dim=-1)
+
     for it in range(max_iter):
         x.requires_grad = True
         fval, grad = closure(x)
         with torch.no_grad():
-            x = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
+            x_next = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
+            update_direction = x_next - x
+            cert = torch.norm(utils.bmul(update_direction, 1. / step_size), dim=-1)
+            x.copy_(x_next)
 
         if callback is not None:
             if callback(locals()) is False:
                 break
 
     fval, grad = closure(x)
-    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
+    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad,
+                                   certificate=cert)
 
 
 def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
@@ -299,11 +309,14 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     if type(step) == float:
         step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
 
+    cert = np.inf * torch.ones(batch_size, device=x.device)
+
     for it in range(max_iter):
 
         x.requires_grad = True
         fval, grad = closure(x)
         update_direction, max_step_size = lmo(-grad, x)
+        cert = utils.bdot(-grad, update_direction)
 
         if step == 'sublinear':
             step_size = 2. / (it + 2) * torch.ones(batch_size, dtype=x.dtype, device=x.device)
@@ -317,4 +330,5 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
                 break
 
     fval, grad = closure(x)
-    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
+    return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad,
+                                   certificate=cert)
