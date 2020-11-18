@@ -2,7 +2,7 @@
 # pytorCH OPtimize: a library for continuous optimization built on PyTorch
  ...with applications to adversarially attacking and training neural networks.
  
-!! WARNING !! This library is in early development. Its API may change often for the time being.
+:warning: This library is in early development, API might change without notice.:warning:
 
 ## Stochastic Algorithms
 We define stochastic optimizers in the `chop.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
