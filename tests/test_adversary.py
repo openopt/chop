@@ -30,8 +30,7 @@ def test_adversary_synthetic_data(algorithm, step_size, p):
     # Setup
     torch.manual_seed(0)
     use_cuda = torch.cuda.is_available()
-    # device = torch.device("cuda" if use_cuda else "cpu")
-    device = torch.device("cpu")
+    device = torch.device("cuda" if use_cuda else "cpu")
 
     data = torch.rand((1, 25, 25))
     target = torch.zeros(1).long()
@@ -93,12 +92,11 @@ def test_adversary_mnist(algorithm, step, p, model_filename):
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    # device = torch.device("cpu")
+    device = torch.device("cpu")
 
     model = LeNet5()
     model_path = os.path.join(TRAINED_MODEL_PATH, model_filename)
-    model.load_state_dict(torch.load(model_path))
-    model.to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
     criterion = nn.CrossEntropyLoss()

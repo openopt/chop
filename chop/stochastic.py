@@ -101,6 +101,8 @@ class PGD(Optimizer):
     @property
     @torch.no_grad()
     def certificate(self):
+        """A generator over the current convergence certificate estimate
+        for each optimized parameter."""
         for groups in self.param_groups:
             for p in groups['params']:
                 state = self.state[p]
@@ -157,6 +159,8 @@ class PGDMadry(Optimizer):
     @property
     @torch.no_grad()
     def certificate(self):
+        """A generator over the current convergence certificate estimate
+        for each optimized parameter."""
         for groups in self.param_groups:
             for p in groups['params']:
                 state = self.state[p]
@@ -240,8 +244,8 @@ class FrankWolfe(Optimizer):
     @property
     @torch.no_grad()
     def certificate(self):
-        """For each parameter optimized, gives the current value of the 
-        estimated optimality certificate."""
+        """A generator over the current convergence certificate estimate
+        for each optimized parameter."""
         for group in self.param_groups:
             for p in group['params']:
                 state = self.state[p]

@@ -1,10 +1,8 @@
-from chop.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
-from chop.utils import closure
-
 import torch
 from tqdm import tqdm
 
 import chop
+from chop.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
 from chop.data import load_cifar10
 from chop.adversary import Adversary
 
@@ -70,7 +68,6 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
                                                      step=2. / max_iter,
                                                      max_iter=max_iter)
 
-    delta_split = torch.zeros_like(data, device=data.device)
     _, delta_split = adversary_split.perturb(data, target, model,
                                              criterion,
                                              use_best=False,

@@ -25,6 +25,8 @@ install:
   - pip install cox requests
   - pip install git+https://github.com/RobustBench/robustbench
   - pip install pytest
+  - pip install advertorch
+  - pip install copt
 
 
 script:
