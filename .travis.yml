@@ -20,7 +20,8 @@ install:
   - conda activate chop
   - python setup.py develop
   # The following is only needed for examples and coverage tests
-  - conda install matplotlib tensorboardX cox requests
+  - conda install matplotlib
+  - pip install tensorboardX cox requests
   - pip install git+https://github.com/RobustBench/robustbench
   - pip install pytest advertorch copt python-coveralls coverage pytest-cov
 
