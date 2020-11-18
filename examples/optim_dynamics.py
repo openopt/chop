@@ -71,7 +71,8 @@ if __name__ == "__main__":
     sol_splitting = minimize_three_split(loss_func, x_0, prox1=constraint.prox, 
                                          max_iter=iterations, callback=log_splitting)
 
-    sol_fw = minimize_frank_wolfe(loss_func, x_0, constraint.lmo, callback=log_fw)
+    sol_fw = minimize_frank_wolfe(loss_func, x_0, constraint.lmo, callback=log_fw,
+                                  max_iter=iterations)
 
     fig, ax = plt.subplots()
     ax.plot(losses_pgd, label="PGD")

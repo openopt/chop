@@ -31,8 +31,7 @@ def test_minimize_pgd():
                              step=1.,
                              max_iter=max_iter, callback=trace_cb)
 
-    assert sol.certificate.allclose(torch.zeros(batch_size, dtype=torch.float),
-                                    atol=1e-4), sol.certificate
+    assert sol.certificate.allclose(torch.zeros(batch_size, dtype=torch.float)), sol.certificate
 
 
 def test_minimize_frank_wolfe():
