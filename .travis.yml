@@ -22,6 +22,7 @@ install:
   - py.test --version
   # The following is only needed for examples and coverage tests
   - conda install matplotlib
+  - pip install tensorboardX
   - pip install cox requests
   - pip install git+https://github.com/RobustBench/robustbench
 
