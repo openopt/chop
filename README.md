@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.org/openopt/chop.svg?branch=master)](https://travis-ci.org/openopt/chop)
+[![Coverage Status](https://coveralls.io/repos/github/openopt/chop/badge.svg?branch=master)](https://coveralls.io/github/openopt/chop?branch=master)
+
 # pytorCH OPtimize: a library for continuous optimization built on PyTorch
  ...with applications to adversarially attacking and training neural networks.
  
