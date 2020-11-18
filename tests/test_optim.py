@@ -54,11 +54,15 @@ def test_minimize_frank_wolfe():
     x = sol.x
     grad = sol.grad
     cert = constraint.fw_gap(grad, x)
-    assert cert.allclose(torch.zeros(batch_size, dtype=torch.float), atol=1e-3), cert
+    assert cert.allclose(torch.zeros(batch_size, dtype=torch.float), atol=1e-4), cert
 
 
 def test_minimize_three_split():
     max_iter = 200
     x0 = torch.zeros_like(xstar)
+    batch_size = x0.size(0)
     sol = optim.minimize_three_split(loss_fun, x0, constraint.prox,
                                      max_iter=max_iter)
+
+    cert = sol.certificate
+    assert cert.allclose(torch.zeros(batch_size, dtype=torch.float), atol=1e-5)

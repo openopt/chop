@@ -4,11 +4,11 @@ import numpy as np
 import torch
 
 from chop.constraints import LinfBall
-from chop.stochastic import PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe
+from chop.stochastic import PGD, PGDMadry, FrankWolfe
 
 torch.random.manual_seed(0)
 
-OPTIMIZER_CLASSES = [PGD, PGDMadry, FrankWolfe, MomentumFrankWolfe]
+OPTIMIZER_CLASSES = [PGD, PGDMadry, FrankWolfe]
 
 
 def setup_problem(make_nonconvex=False):
@@ -35,10 +35,9 @@ def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
     losses = []
     # Use Madry's heuristic for step size
     step_size = {
-        FrankWolfe.name: None,
-        MomentumFrankWolfe.name: None,
+        FrankWolfe.name: 2.5 / iterations,
         PGD.name: 2.5 * constraint.alpha / iterations * 2.,
-        PGDMadry.name: 2.5 * constraint.alpha / iterations
+        PGDMadry.name: 2.5 / iterations
     }
 
     for _ in range(iterations):

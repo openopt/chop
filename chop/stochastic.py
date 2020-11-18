@@ -192,12 +192,12 @@ class PairwiseFrankWolfe(Optimizer):
         super(PairwiseFrankWolfe, self).__init__(params, defaults)
 
 
-class MomentumFrankWolfe(Optimizer):
+class FrankWolfe(Optimizer):
     """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al.
     This is essentially FrankWolfe with Momentum.
     We use the tricks from [Pokutta, Spiegel, Zimmer, 2020].
     https://arxiv.org/abs/2010.07243"""
-    name = 'Momentum-FW'
+    name = 'Frank-Wolfe'
 
     def __init__(self, params, constraint, lr=.1, momentum=.9):
         def _lmo(u, x):
@@ -213,7 +213,7 @@ class MomentumFrankWolfe(Optimizer):
             raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
-        super(MomentumFrankWolfe, self).__init__(params, defaults)
+        super(FrankWolfe, self).__init__(params, defaults)
 
     @torch.no_grad()
     def step(self, closure=None):

@@ -172,7 +172,7 @@ def minimize_three_split(
         if success.all():
             break
 
-    return optimize.OptimizeResult(x=x, success=success, nit=it, fval=fval)
+    return optimize.OptimizeResult(x=x, success=success, nit=it, fval=fval, certificate=certificate)
 
 
 def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_args=(), callback=None):

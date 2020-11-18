@@ -31,7 +31,7 @@ tol = 4e-3
 
 
 @pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
-                                       stochastic.MomentumFrankWolfe])
+                                       stochastic.FrankWolfe])
 @pytest.mark.parametrize('lr', [1., .5, .1, .05, .001, 0.])
 def test_L1Ball(algorithm, lr):
     # Setup
