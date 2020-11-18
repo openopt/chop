@@ -31,7 +31,7 @@ class Adversary:
 
         class UseBest:
             def __init__(self):
-                self.best = torch.zeros_like(data)
+                self.best = torch.zeros_like(data, device=device)
                 self.best_loss = -np.inf * torch.ones(batch_size, device=device)
 
             def __call__(self, kwargs):

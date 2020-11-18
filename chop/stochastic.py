@@ -98,6 +98,14 @@ class PGD(Optimizer):
         defaults = dict(prox=self.prox, name=self.name)
         super(PGD, self).__init__(params, defaults)
 
+    @property
+    @torch.no_grad()
+    def certificate(self):
+        for groups in self.param_groups:
+            for p in groups['params']:
+                state = self.state[p]
+                yield state['certificate']
+
     @torch.no_grad()
     def step(self, closure=None):
         loss = None
@@ -122,7 +130,9 @@ class PGD(Optimizer):
                 else:
                     step_size = self.lr
 
-                p.copy_(self.prox(p - step_size * grad))
+                new_p = self.prox(p - step_size * grad)
+                state['certificate'] = torch.norm((p - new_p) / step_size)
+                p.copy_(new_p)
         return loss
 
 
@@ -143,6 +153,14 @@ class PGDMadry(Optimizer):
         self.lr = lr
         defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
         super(PGDMadry, self).__init__(params, defaults)
+
+    @property
+    @torch.no_grad()
+    def certificate(self):
+        for groups in self.param_groups:
+            for p in groups['params']:
+                state = self.state[p]
+                yield state['certificate']
 
     @torch.no_grad()
     def step(self, step_size=None, closure=None):
@@ -170,7 +188,9 @@ class PGDMadry(Optimizer):
                     step_size = self.lr
                 lmo_res, _ = self.lmo(-p.grad, p)
                 normalized_grad = lmo_res + p
-                p.copy_(self.prox(p + step_size * normalized_grad))
+                new_p = self.prox(p + step_size * normalized_grad)
+                state['certificate'] = torch.norm((p - new_p) / step_size)
+                p.copy_(new_p)
         return loss
 
 
@@ -191,6 +211,8 @@ class PairwiseFrankWolfe(Optimizer):
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
         super(PairwiseFrankWolfe, self).__init__(params, defaults)
 
+        raise NotImplementedError
+
 
 class FrankWolfe(Optimizer):
     """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al.
@@ -206,14 +228,24 @@ class FrankWolfe(Optimizer):
         self.lmo = _lmo
 
         if type(lr) == float:
-            if not (0. <= lr <= 1.):
-                raise ValueError("lr must be in [0., 1.].")
+            if not (0. < lr <= 1.):
+                raise ValueError("lr must be in (0., 1.].")
         self.lr = lr
         if not(0. <= momentum <= 1.):
             raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
         super(FrankWolfe, self).__init__(params, defaults)
+
+    @property
+    @torch.no_grad()
+    def certificate(self):
+        """For each parameter optimized, gives the current value of the 
+        estimated optimality certificate."""
+        for group in self.param_groups:
+            for p in group['params']:
+                state = self.state[p]
+                yield state['certificate']
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -258,6 +290,7 @@ class FrankWolfe(Optimizer):
                 state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
                 grad_norm = torch.norm(state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
+                state['certificate'] = torch.dot(-state['grad_estimate'], update_direction)
                 step_size = min(1., step_size * grad_norm / torch.norm(update_direction))
                 p += step_size * update_direction
         return loss

@@ -32,7 +32,7 @@ tol = 4e-3
 
 @pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
                                        stochastic.FrankWolfe])
-@pytest.mark.parametrize('lr', [1., .5, .1, .05, .001, 0.])
+@pytest.mark.parametrize('lr', [1., .5, .1, .05, .001])
 def test_L1Ball(algorithm, lr):
     # Setup
     constraint = chop.constraints.L1Ball(alpha)
@@ -47,21 +47,20 @@ def test_L1Ball(algorithm, lr):
     store.add_table('metadata', {'algorithm': str, 'lr': float})
 
     store['metadata'].append_row({'algorithm': optimizer.name, 'lr': lr})
-    store.add_table(optimizer.name, {'func_val': float, 'FW gap': float,
+    store.add_table(optimizer.name, {'func_val': float, 'certificate': float,
                                      'norm(w_t)': float})
-    gap = torch.tensor(np.inf)
+    cert = torch.tensor(np.inf)
     for ii in range(MAX_ITER):
         optimizer.zero_grad()
         loss = criterion(X.mv(w_t), y)
         loss.backward()
 
-        # Compute gap
-        with torch.no_grad():
-            gap = constraint.fw_gap(w_t.grad, w_t)
-
         optimizer.step()
+
+        cert = next(optimizer.certificate)  # only one parameter here
+
         store.log_table_and_tb(optimizer.name, {'func_val': loss.item(),
-                                                'FW gap': gap.item(),
+                                                'certificate': cert.item(),
                                                 'norm(w_t)': sum(abs(w_t)).item()
                                                 })
         store[optimizer.name].flush_row()
