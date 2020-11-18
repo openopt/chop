@@ -11,11 +11,11 @@ from robustbench.utils import load_model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-batch_size = 100
+batch_size = 50
 n_examples = 10000
 loader = load_cifar10(batch_size=batch_size, data_dir='~/datasets')
 
-model_name = 'Standard'
+model_name = 'Engstrom2019Robustness'
 model = load_model(model_name, norm='Linf').to(device)
 criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
@@ -32,6 +32,11 @@ n_correct_adv_pgd_madry = 0
 n_correct_adv_pgd = 0
 n_correct_adv_split = 0
 n_correct_adv_fw = 0
+
+adversary_pgd = Adversary(minimize_pgd)
+adversary_pgd_madry = Adversary(minimize_pgd_madry)
+adversary_split = Adversary(minimize_three_split)
+adversary_fw = Adversary(minimize_frank_wolfe)
 
 for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
     data = data.to(device)
@@ -50,10 +55,6 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
         delta = image_constraint_prox(delta, step_size)
         return delta
 
-    adversary_pgd = Adversary(minimize_pgd)
-    adversary_pgd_madry = Adversary(minimize_pgd_madry)
-    adversary_split = Adversary(minimize_three_split)
-    adversary_fw = Adversary(minimize_frank_wolfe)
 
     _, delta_pgd = adversary_pgd.perturb(data, target, model, criterion,
                                          use_best=False,
