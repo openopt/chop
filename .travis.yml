@@ -20,6 +20,11 @@ install:
   - conda activate chop
   - python setup.py develop
   - py.test --version
+  # The following is only needed for examples and coverage tests
+  - conda install matplotlib
+  - pip install cox requests
+  - pip install git+https://github.com/RobustBench/robustbench
+
 
 script:
   - py.test -v
