@@ -12,9 +12,9 @@ We define stochastic optimizers in the `chop.stochastic` module. These follow Py
 ### Examples:
 - `examples/training_constrained_net_on_mnist.py` for a model training use case.
 
-## Full Gradient Constrained Algorithms
+## Full Gradient Algorithms
 
-We also define full-gradient constrained algorithms which operate on a batch of optimization problems in the `chop.optim` module. These are used for adversarial attacks, using the `chop.Adversary` wrapper.
+We also define full-gradient algorithms which operate on a batch of optimization problems in the `chop.optim` module. These are used for adversarial attacks, using the `chop.Adversary` wrapper.
 
 ### Examples:
 
