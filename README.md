@@ -27,7 +27,7 @@ Run the tests with `pytests tests`.
 
 ## Citing
 
-If this software is useful to your research, please consider citing
+If this software is useful to your research, please consider citing it as
 ```
 @article{chop,
   author       = {Geoffrey Negiar, Fabian Pedregosa},
