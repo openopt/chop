@@ -21,13 +21,9 @@ install:
   - python setup.py develop
   # The following is only needed for examples and coverage tests
   - conda install matplotlib
-  - pip install tensorboardX
-  - pip install cox requests
+  - pip install tensorboardX cox requests
   - pip install git+https://github.com/RobustBench/robustbench
-  - pip install pytest
-  - pip install advertorch
-  - pip install copt
-
+  - pip install pytest advertorch copt python-coveralls coverage pytest-cov
 
 script:
   - pytest
