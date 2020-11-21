@@ -26,4 +26,11 @@ install:
   - pip install pytest advertorch copt python-coveralls coverage pytest-cov
 
 script:
-  - pytest
+  - py.test -v --cov=chop
+ 
+after_success:
+  - coveralls
+
+cache:
+  directories:
+    - $HOME/chop_data/
