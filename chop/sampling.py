@@ -28,3 +28,20 @@ def sample_langevin(closure, x0, step_size):
             prev_loss[mask] = loss[mask].detach().clone()
             yield xt_new
             xt = xt_new.detach().clone()
+
+
+def sample_prox(closure, gaussian_oracle, x0, step_size):
+    """
+    Samples from a log-concave, composite distribution of the form:
+    .. math::
+        \frac{d\pi}{dx} \propto \exp(-f(x) - g(x))
+
+    where :math: `f` is :math: `L`-smooth and :math: `\mu`-strongly convex, and
+    :math: `g` is convex, but possibly non-smooth.
+    We suppose that we have access to a gaussian oracle for sampling from 
+    the marginal from :math: `g`.
+    This is the sampling version of the proximal operator of g found in convex optimization.
+
+    More details in https://arxiv.org/abs/2006.05976
+    """
+    raise NotImplementedError
