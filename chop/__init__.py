@@ -5,4 +5,5 @@ from . import stochastic
 from . import optim
 from . import constraints
 from . import data
+from . import sampling
 from .adversary import Adversary
