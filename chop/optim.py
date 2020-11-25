@@ -229,7 +229,7 @@ def backtracking_pgd(closure, prox, step_size, x, grad, increase=1.01, decrease=
                                       dim=-1))) ** 2
 
 
-def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
+def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
                  max_iter_backtracking=1000,
                  backtracking_factor=.6,
                  tol=1e-8,
@@ -249,9 +249,10 @@ def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
       prox: callable
         proximal operator of g
 
-      step: None or float or torch.tensor of shape (batch_size,).
+      step: 'backtracking' or float or torch.tensor of shape (batch_size,) or None.
         step size to be used. If None, will be estimated at the beginning
         using line search.
+        If 'backtracking', will be estimated at each step using backtracking line search.
 
       max_iter: int
         number of iterations to perform.
