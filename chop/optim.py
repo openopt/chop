@@ -5,6 +5,7 @@ This module contains full gradient optimizers in PyTorch.
 These optimizers expect to be called on variables of shape (batch_size, *),
 and will perform the optimization point-wise over the batch."""
 
+import warnings
 import torch
 import numpy as np
 from scipy import optimize
@@ -206,7 +207,32 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_arg
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad)
 
 
+def backtracking_pgd(closure, prox, step_size, x, grad, increase=1.01, decrease=.6, max_iter_backtracking=1000):
+
+    batch_size = x.size(0)
+    rhs = -np.inf * torch.ones(batch_size)
+    lhs = np.inf * torch.ones(batch_size)
+
+    need_to_backtrack = lhs > rhs
+
+    while (~need_to_backtrack).any():
+        step_size[~need_to_backtrack] *= increase
+
+    while need_to_backtrack.any():
+      with torch.no_grad():
+          x_candidate = prox(x - utils.bmul(step_size, grad), step_size)
+
+      lhs = closure(x_candidate, return_jac=False)
+      rhs = (closure(x, return_jac=False) - utils.bdot(grad, x - x_candidate)
+              + utils.bmul(1. / (2 * step_size),
+                          torch.norm((x - x_candidate).view(x.size(0), -1),
+                                      dim=-1))) ** 2
+
+
 def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
+                 max_iter_backtracking=1000,
+                 backtracking_factor=.6,
+                 tol=1e-8,
                  *prox_args,
                  callback=None):
     """
@@ -224,10 +250,21 @@ def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
         proximal operator of g
 
       step: None or float or torch.tensor of shape (batch_size,).
-        step size to be used. If None, will be estimated at the beginning using line search.
+        step size to be used. If None, will be estimated at the beginning
+        using line search.
 
       max_iter: int
         number of iterations to perform.
+
+      max_iter_backtracking: int
+        max number of iterations in the backtracking line search
+
+      backtracking_factor: float
+        factor by which to multiply the step sizes during line search
+
+      tol: float
+        stops the algorithm when the certificate is smaller than tol
+        for all datapoints in the batch
 
       prox_args: tuple
         (optional) additional args for prox
@@ -244,23 +281,54 @@ def minimize_pgd(closure, x0, prox, step=None, max_iter=200,
         L = utils.init_lipschitz(closure, x0)
         step_size = 1. / L
 
-    if type(step) == float:
+    elif step == 'backtracking':
+        L = 1.8 * utils.init_lipschitz(closure, x0)
+        step_size = 1. / L
+
+    elif type(step) == float:
         step_size = step * torch.ones(batch_size, device=x.device)
 
-    def certificate(x, grad, step_size):
-        return torch.norm((x - prox(x - utils.bmul(step_size, grad),
-                                    step_size)
-                           ).view(x.size(0), -1),
-                          dim=-1)
+    else:
+        raise ValueError("step must be float or backtracking or None")
 
     for it in range(max_iter):
         x.requires_grad = True
         fval, grad = closure(x)
+        x_next = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
+        update_direction = x_next - x
+
+        if step == 'backtracking':
+            step_size *= 1.1
+            mask = torch.ones(batch_size, dtype=bool)
+            for _ in range(max_iter_backtracking):
+                with torch.no_grad():
+                    f_next = closure(x_next, return_jac=False)
+                    rhs = (fval
+                           + utils.bdot(grad, update_direction)
+                           + utils.bmul(utils.bdot(update_direction,
+                                                   update_direction),
+                                        1. / (2. * step_size))
+                           )
+                    mask = f_next > rhs
+
+                    if not mask.any():
+                        break
+
+                    step_size[mask] *= backtracking_factor
+                    x_next[mask] = prox(x[mask] - utils.bmul(step_size[mask],
+                                                             grad[mask]),
+                                        step_size[mask])
+                    update_direction[mask] = x_next[mask] - x[mask]
+            else:
+                warnings.warn("Maximum number of line-search iterations "
+                              "reached.")
+
         with torch.no_grad():
-            x_next = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
-            update_direction = x_next - x
-            cert = torch.norm(utils.bmul(update_direction, 1. / step_size), dim=-1)
+            cert = torch.norm(utils.bmul(update_direction, 1. / step_size),
+                              dim=-1)
             x.copy_(x_next)
+            if (cert < tol).all():
+                break
 
         if callback is not None:
             if callback(locals()) is False:

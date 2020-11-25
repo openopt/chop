@@ -7,6 +7,7 @@ from chop import utils
 from chop import constraints
 from chop import logging
 
+import pytest
 
 # Set up a batch of toy constrained optimization problems
 batch_size = 20
@@ -22,13 +23,14 @@ def loss_fun(x):
     return .5 * ((x - xstar) ** 2).view(batch_size, -1).sum(-1)
 
 
-def test_minimize_pgd():
+@pytest.mark.parametrize('step', [1., 'backtracking'])
+def test_minimize_pgd(step):
     max_iter = 2000
     x0 = torch.zeros_like(xstar)
     trace_cb = logging.Trace(closure=loss_fun)
 
     sol = optim.minimize_pgd(loss_fun, x0, constraint.prox,
-                             step=1.,
+                             step=step,
                              max_iter=max_iter, callback=trace_cb)
 
     assert sol.certificate.allclose(torch.zeros(batch_size, dtype=torch.float)), sol.certificate
