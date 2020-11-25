@@ -16,14 +16,23 @@ before_install:
   - conda info -a
 
 install:
+  # Environment setup.
   - conda env create -f environment.yml python=$TRAVIS_PYTHON_VERSION
   - conda activate chop
   - python setup.py develop
   # The following is only needed for examples and coverage tests
   - conda install matplotlib
   - pip install tensorboardX cox requests
+  - pip install advertorch copt
   - pip install git+https://github.com/RobustBench/robustbench
-  - pip install pytest advertorch copt python-coveralls coverage pytest-cov
+  - pip install python-coveralls coverage pytest-cov
 
 script:
-  - pytest
+  - py.test -v --cov=chop
+ 
+after_success:
+  - coveralls
+
+cache:
+  directories:
+    - $HOME/chop_data/
