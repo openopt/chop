@@ -9,8 +9,6 @@ from chop import utils
 
 torch.random.manual_seed(0)
 
-OPTIMIZERS = [minimize_pgd, minimize_pgd_madry]
-
 
 def setup_problem(make_nonconvex=False):
     alpha = 1.
@@ -39,7 +37,7 @@ def log(kwargs, iterates, losses):
 
 if __name__ == "__main__":
 
-    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=False)
+    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=True)
     iterations = 10
 
     iterates_pgd = [x_0.squeeze().data]
@@ -58,13 +56,12 @@ if __name__ == "__main__":
     log_fw = partial(log, iterates=iterates_fw, losses=losses_fw)
 
     sol_pgd = minimize_pgd(loss_func, x_0, constraint.prox,
-                                 step=1.,
-                                 max_iter=iterations,
-                                 callback=log_pgd)
+                           max_iter=iterations,
+                           callback=log_pgd)
 
     sol_pgd_madry = minimize_pgd_madry(loss_func, x_0, constraint.prox,
                                        constraint.lmo,
-                                       step=2. * constraint.alpha / iterations,
+                                       step=2. / iterations,
                                        max_iter=iterations,
                                        callback=log_pgd_madry)
 

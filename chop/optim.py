@@ -294,15 +294,18 @@ def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
 
     for it in range(max_iter):
         x.requires_grad = True
+
         fval, grad = closure(x)
+
         x_next = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
         update_direction = x_next - x
 
         if step == 'backtracking':
             step_size *= 1.1
-            mask = torch.ones(batch_size, dtype=bool)
-            for _ in range(max_iter_backtracking):
-                with torch.no_grad():
+            mask = torch.ones(batch_size, dtype=bool, device=x.device)
+
+            with torch.no_grad():
+                for _ in range(max_iter_backtracking):
                     f_next = closure(x_next, return_jac=False)
                     rhs = (fval
                            + utils.bdot(grad, update_direction)
@@ -316,13 +319,14 @@ def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
                         break
 
                     step_size[mask] *= backtracking_factor
-                    x_next[mask] = prox(x[mask] - utils.bmul(step_size[mask],
-                                                             grad[mask]),
-                                        step_size[mask])
+                    x_next = prox(x - utils.bmul(step_size,
+                                                 grad),
+                                  step_size[mask],
+                                  *prox_args)
                     update_direction[mask] = x_next[mask] - x[mask]
-            else:
-                warnings.warn("Maximum number of line-search iterations "
-                              "reached.")
+                else:
+                    warnings.warn("Maximum number of line-search iterations "
+                                  "reached.")
 
         with torch.no_grad():
             cert = torch.norm(utils.bmul(update_direction, 1. / step_size),
