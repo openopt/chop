@@ -25,7 +25,7 @@ install:
   - pip install tensorboardX cox requests
   - pip install advertorch copt
   - pip install git+https://github.com/RobustBench/robustbench
-  - pip install python-coveralls coverage pytest-cov
+  - pip install coveralls coverage pytest-cov
 
 script:
   - py.test -v --cov=chop
