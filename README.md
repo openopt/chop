@@ -40,4 +40,5 @@ If this software is useful to your research, please consider citing it as
 
 ## Affiliations
 
-Geoffrey Négiar is in the Mahoney lab and the El Ghaoui lab at UC Berkeley. Fabian Pedregosa is at Google Research.
+Geoffrey Négiar is in the Mahoney lab and the El Ghaoui lab at UC Berkeley.
+Fabian Pedregosa is at Google Research.
