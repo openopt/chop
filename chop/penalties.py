@@ -7,6 +7,7 @@ Code inspired from https://github.com/openopt/copt/
 
 import torch
 
+from chop import utils
 
 class GroupL1:
     """
@@ -25,9 +26,34 @@ class GroupL1:
             group_norms = torch.stack([torch.linalg.norm(x[:, g], dim=-1)
                                        for g in self.groups])
         else:
-            group_norms = torch.stack([torch.linalg.norm(x[(slice(None),) + tuple(zip(*g))],
+            group_norms = torch.stack([torch.linalg.norm(x[(Ellipsis,) + tuple(zip(*g))],
                                                          dim=-1)
                                        for g in self.groups])
 
         return self.alpha * group_norms.sum(dim=0)
 
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
+        out = x.detach().clone()
+
+        if x.dim() == 2:
+            for g in self.groups:
+                norm = torch.linalg.norm(x[:, g], dim=-1)
+
+                mask = norm > self.alpha * step_size
+
+                out[mask, g] -= step_size * self.alpha * utils.bmul(out[mask, g], 1. / norm)
+                out[~mask, g] = 0
+
+            return out
+
+        for g in self.groups:
+            idx = tuple(zip(*g))
+            norm = torch.linalg.norm(x[(slice(None),) + idx], dim=-1)
+            mask = norm > self.alpha * step_size
+
+            out[mask][slice(None, ) + idx] -= step_size * self.alpha * utils.bmul(out[mask][slice(None, ) + idx], 1. / norm)
+            out[~mask][slice(None, ) + idx] = 0
+
+        return out
+        
