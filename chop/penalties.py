@@ -6,8 +6,27 @@ Code inspired from https://github.com/openopt/copt/
 """
 
 import torch
+import torch.functional as F
 
 from chop import utils
+
+
+class L1:
+    """L1 penalty. Batch-wise function."""
+
+    def __init__(self, alpha):
+        if alpha < 0:
+            raise ValueError("alpha must be non negative.")
+        self.alpha = alpha
+
+    def __call__(self, x):
+        batch_size = x.size(0)
+        return abs(x.view(batch_size, -1)).sum(dim=-1)
+
+    def prox(self, x, step_size=None):
+        """Prox operator for L1 norm. This is given by soft-thresholding."""
+        return torch.sign(x) * F.relu(abs(x) - step_size)
+
 
 class GroupL1:
     """
