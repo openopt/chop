@@ -4,6 +4,7 @@ __version__ = "0.0.1"
 from . import stochastic
 from . import optim
 from . import constraints
+from . import penalties
 from . import data
 from . import sampling
 from .adversary import Adversary
