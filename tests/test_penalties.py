@@ -5,6 +5,17 @@ import torch
 import chop
 
 
+def test_groupL1_unit_groups_against_lasso_1d():
+    groups = tuple(torch.arange(4))
+    alpha = 1.
+    lasso = chop.penalties.L1(alpha)
+    groupLasso = chop.penalties.GroupL1(alpha, groups)
+
+    batch_size = 3
+    data = torch.rand(batch_size, 4)
+    assert torch.allclose(lasso(data), groupLasso(data))
+
+
 def test_groupL1_1d():
     groups = [(0, 1),
               (2, 3)]

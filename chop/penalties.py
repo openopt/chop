@@ -42,7 +42,7 @@ class GroupL1:
 
     def __call__(self, x):
         if x.dim() == 2:
-            group_norms = torch.stack([torch.linalg.norm(x[:, g], dim=-1)
+            group_norms = torch.stack([torch.linalg.norm(x[:, (g,)], dim=-1)
                                        for g in self.groups])
         else:
             group_norms = torch.stack([torch.linalg.norm(x[(Ellipsis,) + tuple(zip(*g))],
