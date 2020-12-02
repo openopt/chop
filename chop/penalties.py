@@ -25,7 +25,7 @@ class L1:
 
     def prox(self, x, step_size=None):
         """Prox operator for L1 norm. This is given by soft-thresholding."""
-        return torch.sign(x) * F.relu(abs(x) - step_size)
+        return torch.sign(x) * F.relu(abs(x) - self.alpha * step_size)
 
 
 class GroupL1:
