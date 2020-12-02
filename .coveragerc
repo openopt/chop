@@ -6,3 +6,4 @@ include = */chop/*
 [report]
 exclude_lines =
     if verbose
+omit = **/data_utils.py
