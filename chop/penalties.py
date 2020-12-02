@@ -3,6 +3,8 @@ This module contains various penalties / regularizers.
 They function batch-wise, similar to objects in `chop.constraints`.
 
 Code inspired from https://github.com/openopt/copt/
+
+The proximal operators are derived e.g. in https://www.di.ens.fr/~fbach/opt_book.pdf
 """
 
 import torch
@@ -12,20 +14,45 @@ from chop import utils
 
 
 class L1:
-    """L1 penalty. Batch-wise function."""
+    """L1 penalty. Batch-wise function. For each element in the batch,
+    the L1 penalty is given by
+    ..math::
+        \Omega(x) = \alpha \|x\|_1
+    """
 
-    def __init__(self, alpha):
+    def __init__(self, alpha: float):
+        """
+        Args:
+          alpha: float
+            Size of the penalty. Must be non-negative.
+        """
         if alpha < 0:
             raise ValueError("alpha must be non negative.")
         self.alpha = alpha
 
     def __call__(self, x):
+        """
+        Returns the value of the penalty on x, batch_size.
+
+        Args:
+          x: torch.Tensor
+            x has shape (batch_size, *)
+        """
         batch_size = x.size(0)
         return abs(x.view(batch_size, -1)).sum(dim=-1)
 
     def prox(self, x, step_size=None):
-        """Prox operator for L1 norm. This is given by soft-thresholding."""
-        return torch.sign(x) * F.relu(abs(x) - self.alpha * step_size)
+        """Proximal operator for the L1 norm penalty. This is given by soft-thresholding.
+
+        Args:
+          x: torch.Tensor
+            x has shape (batch_size, *)
+          step_size: float or torch.Tensor of shape (batch_size,)
+        
+        """
+        if type(step_size) == float:
+            step_size *= torch.ones(x.size(0))
+        return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size))
 
 
 class GroupL1:
@@ -34,6 +61,38 @@ class GroupL1:
     """
 
     def __init__(self, alpha, groups):
+        """
+        Args:
+          alpha: float
+            Size of the penalty. Must be non-negative.
+
+          groups: iterable of iterables
+            Each element of groups will be used to index the given tensor to compute
+            the penalty on. See example.
+
+        Examples:
+          Our input is of shape (batch_size, 4), and we want to split the features in two groups.
+          The first contains the first two features, and the second the latter two. This is done by:
+            $ groups = [(0, 1), (2, 3)]
+
+          In this case, since the groups are of equal size, we could have used
+            $ groups = torch.tensor([[0, 1],
+            $                        [2, 3]])
+
+          If the input is of shape (batch_size, 4, 2), and we want to split
+          our features in 2 groups (left half and right half of the image), then each group
+          is an iterable over the coordinates contained in it.
+
+            $ groups = [((0, 0), (0, 1), (1, 0), (1, 1)),
+            $           ((2, 0), (2, 1), (3, 0), (3, 1))]
+
+          The same convention is used for higher dimension inputs.
+          If the provided coordinates are of smaller dimension, they will be prepended
+          by an Ellipsis.
+
+        Todo:
+          * Test the Ellipsis behavior.
+        """
         self.alpha = alpha
 
         # TODO: implement ValueErrors
@@ -57,6 +116,14 @@ class GroupL1:
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """
+        Returns the proximal operator for the (non overlapping) Group L1 norm.
+        Args:
+          x: torch.Tensor of shape (batch_size, *)
+
+          step_size: float or torch.Tensor of shape (batch_size,)
+
+        """
         out = x.detach().clone()
         if type(step_size) == float:
             step_size *= torch.ones(x.size(0))
