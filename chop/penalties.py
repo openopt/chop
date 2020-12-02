@@ -6,7 +6,7 @@ Code inspired from https://github.com/openopt/copt/
 """
 
 import torch
-import torch.functional as F
+import torch.nn.functional as F
 
 from chop import utils
 
@@ -37,12 +37,16 @@ class GroupL1:
         self.alpha = alpha
 
         # TODO: implement ValueErrors
-        # groups must be indices
+        # groups must be indices and non overlapping
+        if not isinstance(groups[0], torch.Tensor):
+            groups = [torch.tensor(group) for group in groups]
+        if groups[0].dim() == 0:
+            groups = [torch.tensor([group]) for group in groups]
         self.groups = groups
 
     def __call__(self, x):
         if x.dim() == 2:
-            group_norms = torch.stack([torch.linalg.norm(x[:, (g,)], dim=-1)
+            group_norms = torch.stack([torch.linalg.norm(x[:, g], dim=-1)
                                        for g in self.groups])
         else:
             group_norms = torch.stack([torch.linalg.norm(x[(Ellipsis,) + tuple(zip(*g))],
@@ -54,25 +58,23 @@ class GroupL1:
     @torch.no_grad()
     def prox(self, x, step_size=None):
         out = x.detach().clone()
+        if type(step_size) == float:
+            step_size *= torch.ones(x.size(0))
 
         if x.dim() == 2:
             for g in self.groups:
                 norm = torch.linalg.norm(x[:, g], dim=-1)
-
-                mask = norm > self.alpha * step_size
-
-                out[mask, g] -= step_size * self.alpha * utils.bmul(out[mask, g], 1. / norm)
-                out[~mask, g] = 0
+                out[:, g] = utils.bmul(out[:, g],
+                                       F.relu(1 - utils.bmul(self.alpha * step_size,
+                                                             1. / norm)))
 
             return out
 
         for g in self.groups:
             idx = tuple(zip(*g))
-            norm = torch.linalg.norm(x[(slice(None),) + idx], dim=-1)
-            mask = norm > self.alpha * step_size
+            norm = torch.linalg.norm(x[(Ellipsis,) + idx], dim=-1)
 
-            out[mask][slice(None, ) + idx] -= step_size * self.alpha * utils.bmul(out[mask][slice(None, ) + idx], 1. / norm)
-            out[~mask][slice(None, ) + idx] = 0
-
+            out[(Ellipsis,) + idx] *= F.relu(1 - utils.bmul(self.alpha * step_size,
+                                                            1. / norm))
         return out
         
