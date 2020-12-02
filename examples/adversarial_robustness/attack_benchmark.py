@@ -13,7 +13,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 50
 n_examples = 10000
-loader = load_cifar10(batch_size=batch_size, data_dir='~/datasets')
+loaders = load_cifar10(test_batch_size=batch_size, data_dir='~/datasets')
+loader = loaders.test
 
 model_name = 'Engstrom2019Robustness'
 model = load_model(model_name, norm='Linf').to(device)
@@ -57,30 +58,34 @@ for k, (data, target) in tqdm(enumerate(loader), total=len(loader)):
 
 
     _, delta_pgd = adversary_pgd.perturb(data, target, model, criterion,
-                                         use_best=False,
+                                         use_best=True,
+                                         step='backtracking',
                                          prox=prox,
                                          max_iter=max_iter)
 
-    _, delta_pgd_madry = adversary_pgd_madry.perturb(data, target, model,
-                                                     criterion,
-                                                     use_best=False,
-                                                     prox=prox,
-                                                     lmo=constraint.lmo,
-                                                     step=2. / max_iter,
-                                                     max_iter=max_iter)
+    delta_pgd_madry = torch.zeros_like(data)
+    # _, delta_pgd_madry = adversary_pgd_madry.perturb(data, target, model,
+    #                                                  criterion,
+    #                                                  use_best=False,
+    #                                                  prox=prox,
+    #                                                  lmo=constraint.lmo,
+    #                                                  step=2. / max_iter,
+    #                                                  max_iter=max_iter)
 
-    _, delta_split = adversary_split.perturb(data, target, model,
-                                             criterion,
-                                             use_best=False,
-                                             prox1=constraint.prox,
-                                             prox2=image_constraint_prox,
-                                             max_iter=max_iter)
+    delta_split = torch.zeros_like(data)
+    # _, delta_split = adversary_split.perturb(data, target, model,
+    #                                          criterion,
+    #                                          use_best=False,
+    #                                          prox1=constraint.prox,
+    #                                          prox2=image_constraint_prox,
+    #                                          max_iter=max_iter)
 
-    _, delta_fw = adversary_fw.perturb(data, target, model, criterion,
-                                       lmo=constraint.lmo,
-                                       step='sublinear',
-                                       max_iter=max_iter
-                                       )
+    delta_fw = torch.zeros_like(data)
+    # _, delta_fw = adversary_fw.perturb(data, target, model, criterion,
+    #                                    lmo=constraint.lmo,
+    #                                    step='sublinear',
+    #                                    max_iter=max_iter
+    #                                    )
 
     label = torch.argmax(model(data), dim=-1)
     n_correct += (label == target).sum().item()

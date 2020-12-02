@@ -14,17 +14,17 @@ device = torch.device('cuda' if torch.cuda.is_available()
 n_epochs = 128
 batch_size = 100
 
-trainloader = chop.data.load_cifar10(batch_size=batch_size,
-                                     train=True,
-                                     data_dir='~/datasets')
-testloader = chop.data.load_cifar10(batch_size=batch_size,
-                                    data_dir='~/datasets')
+loaders = chop.data.load_cifar10(train_batch_size=batch_size,
+                                 test_batch_size=batch_size,
+                                 data_dir='~/datasets')
+trainloader, testloader = loaders.train, loaders.test
 
 model = models.resnet18(pretrained=False)
 model.to(device)
 
 criterion = torch.nn.CrossEntropyLoss()
 
+# TODO: use learning rate schedulers
 optimizer = SGD(model.parameters(), lr=.1, momentum=.9, weight_decay=5e-4)
 
 # Define the perturbation constraint set
