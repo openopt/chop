@@ -141,7 +141,6 @@ class GroupL1:
             idx = tuple(zip(*g))
             norm = torch.linalg.norm(x[(Ellipsis,) + idx], dim=-1)
 
-            out[(Ellipsis,) + idx] *= F.relu(1 - utils.bmul(self.alpha * step_size,
-                                                            1. / norm))
+            out[(Ellipsis,) + idx] = utils.bmul(out[(Ellipsis,) + idx], F.relu(1 - utils.bmul(self.alpha * step_size,
+                                                            1. / norm)))
         return out
-        
