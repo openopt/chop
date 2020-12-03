@@ -51,8 +51,8 @@ class L1:
         
         """
         if type(step_size) == float:
-            step_size *= torch.ones(x.size(0))
-        return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size))
+            step_size = step_size * torch.ones(x.size(0))
+        return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size.view((-1,) + (1,) * (x.dim() - 1))))
 
 
 class GroupL1:
