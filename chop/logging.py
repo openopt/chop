@@ -4,7 +4,7 @@ from datetime import datetime
 class Trace:
     """Trace callback"""
 
-    def __init__(self, closure, log_x=True, log_grad=False, freq=1, callable=None):
+    def __init__(self, closure=None, log_x=True, log_grad=False, freq=1, callable=None):
         self.freq = int(freq)
         self.log_iterates = log_x
         self.closure = closure
@@ -22,6 +22,9 @@ class Trace:
         self._counter = 0
 
     def __call__(self, kwargs):
+        if self.closure is None:
+            self.closure = kwargs['closure']
+        
         if self._counter % self.freq == 0:
             self.trace_x.append(kwargs['x'].data)
             self.trace_f.append(self.closure(kwargs['x'], return_jac=False).data)
