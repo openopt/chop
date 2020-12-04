@@ -13,21 +13,21 @@ from chop import utils
 
 
 def minimize_three_split(
-    closure,
-    x0,
-    prox1=None,
-    prox2=None,
-    tol=1e-6,
-    max_iter=1000,
-    verbose=0,
-    callback=None,
-    line_search=True,
-    step=None,
-    max_iter_backtracking=100,
-    backtracking_factor=0.7,
-    h_Lipschitz=None,
-    *args_prox
-    ):
+  closure,
+  x0,
+  prox1=None,
+  prox2=None,
+  tol=1e-6,
+  max_iter=1000,
+  verbose=0,
+  callback=None,
+  line_search=True,
+  step=None,
+  max_iter_backtracking=100,
+  backtracking_factor=0.7,
+  h_Lipschitz=None,
+  *args_prox
+  ):
 
     """Davis-Yin three operator splitting method.
     This algorithm can solve problems of the form
@@ -185,10 +185,13 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_arg
         # TODO: this is not the optimal step-size (if there even is one.)
         # I don't recommend to use this.
         L = utils.init_lipschitz(closure, x0)
-        step = 1. / L
+        step_size = 1. / L
 
     if type(step) == float:
-        step = torch.ones(batch_size, device=x.device) * step
+        step_size = torch.ones(batch_size, device=x.device) * step
+
+    else:
+        step_size = step
 
     for it in range(max_iter):
         x.requires_grad = True
@@ -196,8 +199,8 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_arg
         with torch.no_grad():
             update_direction, _ = lmo(-grad, x)
             update_direction += x
-            x = prox(x + utils.bmul(step, update_direction),
-                     step, *prox_args)
+            x = prox(x + utils.bmul(step_size, update_direction),
+                     step_size, *prox_args)
 
         if callback is not None:
             if callback(locals()) is False:
