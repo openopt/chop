@@ -39,7 +39,7 @@ class L1:
             x has shape (batch_size, *)
         """
         batch_size = x.size(0)
-        return abs(x.view(batch_size, -1)).sum(dim=-1)
+        return self.alpha * abs(x.view(batch_size, -1)).sum(dim=-1)
 
     def prox(self, x, step_size=None):
         """Proximal operator for the L1 norm penalty. This is given by soft-thresholding.
