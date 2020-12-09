@@ -9,6 +9,7 @@ import warnings
 import torch
 import numpy as np
 from scipy import optimize
+from numbers import Number
 from chop import utils
 
 
@@ -187,11 +188,14 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_arg
         L = utils.init_lipschitz(closure, x0)
         step_size = 1. / L
 
-    if type(step) == float:
+    elif isinstance(step, Number):
         step_size = torch.ones(batch_size, device=x.device) * step
 
-    else:
+    elif isinstance(step, torch.Tensor):
         step_size = step
+
+    else:
+        raise ValueError("step must be a number or a torch Tensor.")
 
     for it in range(max_iter):
         x.requires_grad = True
