@@ -5,6 +5,7 @@ This module contains full gradient optimizers in PyTorch.
 These optimizers expect to be called on variables of shape (batch_size, *),
 and will perform the optimization point-wise over the batch."""
 
+from numbers import Number
 import warnings
 import torch
 import numpy as np
@@ -38,6 +39,11 @@ def minimize_three_split(
     where f is a smooth function and g and h are (possibly non-smooth)
     functions for which the proximal operator is known.
 
+    Remark: this method returns x = prox1(...). If g and h are two indicator
+      functions, this method only garantees that x is feasible for the first.
+      Therefore if one of the constraints is a hard constraint,
+      make sure to pass it to prox1.
+
     Args:
       closure: callable
         Returns the function values and gradient of the objective function.
@@ -48,14 +54,14 @@ def minimize_three_split(
         Initial guess
 
       prox1 : callable or None
-        prox1(x, alpha, *args) returns the proximal operator of g at xa
-        with parameter alpha.
-        alpha can be a scalar or of shape (batch_size).
+        prox1(x, step_size, *args) returns the proximal operator of g at xa
+        with parameter step_size.
+        step_size can be a scalar or of shape (batch_size,).
 
       prox2 : callable or None
-        prox2(x, alpha, *args) returns the proximal operator of g at xa
-        with parameter alpha.
-        alpha can be a scalar or of shape (batch_size).
+        prox2(x, step_size, *args) returns the proximal operator of g at xa
+        with parameter step_size.
+        alpha can be a scalar or of shape (batch_size,).
 
       tol: float
         Tolerance of the stopping criterion.
@@ -125,8 +131,10 @@ def minimize_three_split(
         line_search = True
         step_size = 1.0 / utils.init_lipschitz(closure, x)
 
-    elif type(step) is float:
-        step_size = step * torch.ones(batch_size, device=x.device)
+    elif isinstance(step, Number):
+        step_size = step * torch.ones(batch_size,
+                                      device=x.device,
+                                      dtype=x.dtype)
 
     else:
         raise ValueError("step must be float or None.")
@@ -379,7 +387,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
       callback: callable
         (optional) Any callable called on locals() at the end of each iteration.
         Often used for logging.
-"""
+    """
     x = x0.detach().clone()
     batch_size = x.size(0)
 
