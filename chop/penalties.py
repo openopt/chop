@@ -7,6 +7,8 @@ Code inspired from https://github.com/openopt/copt/
 The proximal operators are derived e.g. in https://www.di.ens.fr/~fbach/opt_book.pdf
 """
 
+from numbers import Number
+from numpy.core.fromnumeric import nonzero
 import torch
 import torch.nn.functional as F
 
@@ -50,8 +52,8 @@ class L1:
           step_size: float or torch.Tensor of shape (batch_size,)
         
         """
-        if type(step_size) == float:
-            step_size = step_size * torch.ones(x.size(0))
+        if isinstance(step_size, Number):
+            step_size = step_size * torch.ones(x.size(0), device=x.device, dtype=x.dtype)
         return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size.view((-1,) + (1,) * (x.dim() - 1))))
 
 
@@ -125,22 +127,26 @@ class GroupL1:
 
         """
         out = x.detach().clone()
-        if type(step_size) == float:
-            step_size *= torch.ones(x.size(0))
+        if isinstance(step_size, Number):
+            step_size *= torch.ones(x.size(0), dtype=x.dtype, device=x.device)
 
         if x.dim() == 2:
             for g in self.groups:
                 norm = torch.linalg.norm(x[:, g], dim=-1)
-                out[:, g] = utils.bmul(out[:, g],
-                                       F.relu(1 - utils.bmul(self.alpha * step_size,
-                                                             1. / norm)))
+                # Avoids nans.
+                nonzero_norm = torch.nonzero(norm)
+                out[nonzero_norm, g] = utils.bmul(out[nonzero_norm, g],
+                                                  F.relu(1. - utils.bmul(self.alpha * step_size[nonzero_norm],
+                                                                          1. / norm[nonzero_norm])))
 
             return out
 
         for g in self.groups:
-            idx = tuple(zip(*g))
-            norm = torch.linalg.norm(x[(Ellipsis,) + idx], dim=-1)
-
-            out[(Ellipsis,) + idx] = utils.bmul(out[(Ellipsis,) + idx], F.relu(1 - utils.bmul(self.alpha * step_size,
-                                                            1. / norm)))
+            idx = tuple((x for x in g.T))
+            norm = torch.linalg.norm(x[(...,) + idx], dim=-1)
+            nonzero_norm = torch.nonzero(norm)
+            # TODO: Find a cleaner way to not double index
+            out[(nonzero_norm, ...) + idx] = utils.bmul(out[(nonzero_norm, ...) + idx],
+                                                        F.relu(1 - utils.bmul(self.alpha * step_size[nonzero_norm],
+                                                                              1. / norm[nonzero_norm])))
         return out

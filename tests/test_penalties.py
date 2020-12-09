@@ -5,17 +5,33 @@ import torch
 import chop
 
 
-def test_groupL1_unit_groups_against_lasso_1d():
-    groups = torch.arange(4)
-    alpha = 1.
+@pytest.mark.parametrize('alpha', [0., 1e-3, 1.])
+def test_groupL1_unit_groups_against_lasso_1d(alpha):
+    n_features = 4
+    groups = torch.arange(n_features)
     lasso = chop.penalties.L1(alpha)
     groupLasso = chop.penalties.GroupL1(alpha, groups)
 
     batch_size = 3
-    data = torch.rand(batch_size, 4)
+    data = torch.rand(batch_size, n_features)
     assert torch.allclose(lasso(data), groupLasso(data)), '__call__'
 
     assert torch.allclose(lasso.prox(data, 1.), groupLasso.prox(data, 1.)), 'prox'
+
+    if alpha == 0.:
+        assert torch.allclose(data, groupLasso.prox(data, 1.))
+
+
+def test_zero_data_L1_groupL1_prox():
+    batch_size, n_features = 3, 4
+    data = torch.zeros(batch_size, n_features)
+    alpha = 1
+    groups = torch.arange(n_features)
+    lasso = chop.penalties.L1(alpha)
+    groupLasso = chop.penalties.GroupL1(alpha, groups)
+    
+    assert (lasso.prox(data, 1.) == data).all()
+    assert (groupLasso.prox(data, 1.) == data).all()
 
 
 def test_groupL1_1d():
