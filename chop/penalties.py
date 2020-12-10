@@ -130,23 +130,10 @@ class GroupL1:
         if isinstance(step_size, Number):
             step_size *= torch.ones(x.size(0), dtype=x.dtype, device=x.device)
 
-        if x.dim() == 2:
-            for g in self.groups:
-                norm = torch.linalg.norm(x[:, g], dim=-1)
-                # Avoids nans.
-                nonzero_norm = torch.nonzero(norm)
-                out[nonzero_norm, g] = utils.bmul(out[nonzero_norm, g],
-                                                  F.relu(1. - utils.bmul(self.alpha * step_size[nonzero_norm],
-                                                                          1. / norm[nonzero_norm])))
-
-            return out
-
         for g in self.groups:
-            idx = tuple((x for x in g.T))
-            norm = torch.linalg.norm(x[(...,) + idx], dim=-1)
+            norm = torch.linalg.norm(x[..., g.T], dim=-1)
             nonzero_norm = torch.nonzero(norm)
-            # TODO: Find a cleaner way to not double index
-            out[(nonzero_norm, ...) + idx] = utils.bmul(out[(nonzero_norm, ...) + idx],
-                                                        F.relu(1 - utils.bmul(self.alpha * step_size[nonzero_norm],
-                                                                              1. / norm[nonzero_norm])))
+            out[nonzero_norm, ..., g.T] = utils.bmul(out[nonzero_norm, ... , g.T],
+                                                     F.relu(1 - utils.bmul(self.alpha * step_size[nonzero_norm],
+                                                                           1. / norm[nonzero_norm])))
         return out
