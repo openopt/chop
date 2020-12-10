@@ -62,7 +62,9 @@ def create_lp_constraints(model, p=2, value=300, mode='initialization'):
 def euclidean_proj_simplex(v, s=1.):
     r""" Compute the Euclidean projection on a positive simplex
   Solves the optimization problem (using the algorithm from [1]):
+    ..math::
       min_w 0.5 * || w - v ||_2^2 , s.t. \sum_i w_i = s, w_i >= 0
+
   Parameters
   ----------
   v: (n,) numpy array,
@@ -106,16 +108,18 @@ def euclidean_proj_simplex(v, s=1.):
 def euclidean_proj_l1ball(v, s=1.):
     """ Compute the Euclidean projection on a L1-ball
   Solves the optimization problem (using the algorithm from [1]):
+    ..math::
       min_w 0.5 * || w - v ||_2^2 , s.t. || w ||_1 <= s
-  Parameters
-  ----------
-  v: (n,) numpy array,
+      
+  Args:
+  
+    v: (n,) numpy array,
       n-dimensional vector to project
-  s: float, optional, default: 1,
+    s: float, optional, default: 1,
       radius of the L1-ball
-  Returns
-  -------
-  w: (n,) numpy array,
+      
+  Returns:
+    w: (n,) numpy array,
       Euclidean projection of v on the L1-ball of radius s
   Notes
   -----
@@ -297,6 +301,12 @@ def make_LpBall(alpha, p=1):
 
 class Simplex:
 
+    def __init__(self, alpha):
+        if alpha >= 0:
+            self.alpha = alpha
+        else:
+            raise ValueError("alpha must be a non negative number.")
+
     @torch.no_grad()
     def prox(self, x, step_size=None):
         shape = x.shape
@@ -313,3 +323,56 @@ class Simplex:
         )
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
+
+
+class NuclearNormBall:
+    """
+    Nuclear norm constraint, i.e. sum of absolute eigenvalues.
+    Also known as the Schatten-1 norm.
+    We consider the last two dimensions of the input are the ones we compute the Nuclear Norm on.
+    """
+    def __init__(self, alpha):
+        if not 0. <= alpha:
+            raise ValueError("Invalid constraint size alpha: {}".format(alpha))
+        self.alpha = alpha
+
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
+        """
+        Computes the LMO for the Nuclear Norm Ball on the last two dimensions.
+        Returns :math: `s - $iterate$` where
+        
+          ..math::
+            s = \argmin_u u^\top grad.
+
+        Args:
+          grad: torch.Tensor of shape (*, m, n)
+
+          iterate: torch.Tensor of shape (*, m, n)
+
+        Returns:
+          update_direction: torch.Tensor of shape (*, m, n)
+        """
+        update_direction = -iterate.clone().detach()
+        # TODO: only compute FIRST singular vectors, not full SVD
+        # !!! THIS IS HIGHLY INEFFICIENT FOR NOW !!!
+        # get first singular vectors of grad
+        U, S, V = torch.svd(grad)
+        outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
+        update_direction += S[..., 0] * outer 
+        return update_direction
+
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
+        """
+        Projection operator on the Nuclear Norm constraint set.
+        """
+
+        U, S, V = torch.svd(x)
+        # Project S on the alpha-simplex
+        simplex = Simplex(self.alpha)
+
+        S_proj = simplex.prox(S.view(-1, S.size(-1))).view_as(S)
+        
+        VT = V.transpose(-2, -1)
+        return torch.matmul(U, torch.matmul(torch.diag_embed(S_proj), VT))
