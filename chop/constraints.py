@@ -359,7 +359,7 @@ class NuclearNormBall:
         # get first singular vectors of grad
         U, S, V = torch.svd(grad)
         outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
-        update_direction += utils.bmul(S[..., 0], outer)
+        update_direction += self.alpha * utils.bmul(S[..., 0], outer)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
