@@ -2,6 +2,7 @@ import torch
 import chop.constraints as constraints
 import pytest
 
+
 def test_nuclear_norm():
 
     batch_size = 8
