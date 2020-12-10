@@ -6,6 +6,5 @@ from . import optim
 from . import constraints
 from . import penalties
 from . import data
-from . import sampling
 from . import logging
 from .adversary import Adversary
