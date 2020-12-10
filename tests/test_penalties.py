@@ -65,7 +65,8 @@ def test_groupL1_2d():
 
 
 
-@pytest.mark.parametrize("penalty", [chop.penalties.GroupL1(1., np.array_split(np.arange(16), 5))])
+@pytest.mark.parametrize("penalty", [chop.penalties.GroupL1(1., np.array_split(np.arange(16), 5)),
+                                     chop.penalties.L1(1.)])
 def test_three_inequality(penalty):
     """Test the L1 prox using the three point inequality
     The three-point inequality is described e.g., in Lemma 1.4

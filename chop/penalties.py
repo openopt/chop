@@ -101,18 +101,15 @@ class GroupL1:
         # groups must be indices and non overlapping
         if not isinstance(groups[0], torch.Tensor):
             groups = [torch.tensor(group) for group in groups]
-        if groups[0].dim() == 0:
-            groups = [torch.tensor([group]) for group in groups]
+        while groups[0].dim() < 2:
+            groups = [group.unsqueeze(-1) for group in groups]
+            
         self.groups = groups
 
     def __call__(self, x):
-        if x.dim() == 2:
-            group_norms = torch.stack([torch.linalg.norm(x[:, g], dim=-1)
-                                       for g in self.groups])
-        else:
-            group_norms = torch.stack([torch.linalg.norm(x[(Ellipsis,) + tuple(zip(*g))],
-                                                         dim=-1)
-                                       for g in self.groups])
+        group_norms = torch.stack([torch.linalg.norm(x[(...,) + tuple(g.T)],
+                                                     dim=-1)
+                                   for g in self.groups])
 
         return self.alpha * group_norms.sum(dim=0)
 
@@ -131,9 +128,9 @@ class GroupL1:
             step_size *= torch.ones(x.size(0), dtype=x.dtype, device=x.device)
 
         for g in self.groups:
-            norm = torch.linalg.norm(x[..., g.T], dim=-1)
+            norm = torch.linalg.norm(x[(...,) + tuple(g.T)].view(x.size(0), -1), dim=-1)
             nonzero_norm = torch.nonzero(norm)
-            out[nonzero_norm, ..., g.T] = utils.bmul(out[nonzero_norm, ... , g.T],
-                                                     F.relu(1 - utils.bmul(self.alpha * step_size[nonzero_norm],
-                                                                           1. / norm[nonzero_norm])))
+            out[(nonzero_norm, ...) + tuple(g.T)] = utils.bmul(out[(nonzero_norm, ...) + tuple(g.T)],
+                                                               F.relu(1 - utils.bmul(self.alpha * step_size[nonzero_norm],
+                                                                                     1. / norm[nonzero_norm])))
         return out
