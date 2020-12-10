@@ -360,7 +360,7 @@ class NuclearNormBall:
         U, S, V = torch.svd(grad)
         outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
         update_direction += utils.bmul(S[..., 0], outer)
-        return update_direction
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
