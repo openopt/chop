@@ -23,7 +23,7 @@ def test_nuclear_norm():
                                         constraints.Simplex,
                                         constraints.NuclearNormBall])
 def test_projections(constraint):
-    """Tests if projections are true projections:
+    """Tests that projections are true projections:
     ..math::
         p\circ p = p
     """
