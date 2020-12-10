@@ -1,3 +1,4 @@
+from chop.image import group_patches
 import torch
 import chop.constraints as constraints
 import pytest
@@ -38,3 +39,15 @@ def test_projections(constraint):
         proj_data = prox(data)
         # SVD reconstruction doesn't do better than 1e-5
         assert prox(proj_data).allclose(proj_data, atol=1e-5)
+
+
+def test_GroupL1LMO():
+    batch_size = 8
+    alpha = 1.
+    groups = group_patches()
+    constraint = constraints.GroupL1Ball(alpha, groups)
+    data = torch.rand(batch_size, 3, 32, 32)
+    grad = torch.rand(batch_size, 3, 32, 32)
+    
+    constraint.lmo(-grad, data)
+    

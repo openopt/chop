@@ -356,6 +356,7 @@ class NuclearNormBall:
         update_direction = -iterate.clone().detach()
         # TODO: only compute FIRST singular vectors, not full SVD
         # !!! THIS IS HIGHLY INEFFICIENT FOR NOW !!!
+        # TODO: implement power iteration
         # get first singular vectors of grad
         U, S, V = torch.svd(grad)
         outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
@@ -376,3 +377,42 @@ class NuclearNormBall:
         
         VT = V.transpose(-2, -1)
         return torch.matmul(U, torch.matmul(torch.diag_embed(S_proj), VT))
+
+
+class GroupL1Ball:
+
+    # TODO: init is shared with the penalty GroupL1 object. Factorize the code.
+    def __init__(self, alpha, groups):
+        if alpha >= 0:
+            self.alpha = alpha
+        else:
+            raise ValueError("alpha must be nonnegative.")
+        # TODO: implement ValueErrors
+        # groups must be indices and non overlapping
+        if not isinstance(groups[0], torch.Tensor):
+            groups = [torch.tensor(group) for group in groups]
+        while groups[0].dim() < 2:
+            groups = [group.unsqueeze(-1) for group in groups]
+            
+        self.groups = groups
+
+
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
+        batch_size = iterate.size(0)
+        update_direction = -iterate.detach().clone()
+        # find group with largest L2 norm
+        group_norms = torch.stack([torch.linalg.norm(grad[(...,) + tuple(g.T)],
+                                                     dim=-1)
+                                   for g in self.groups]).T
+
+        max_groups = torch.argmax(group_norms, dim=-1)
+
+        for k, max_group in enumerate(max_groups):
+            update_direction[(k, ...) + tuple(self.groups[max_group].T)] += (self.alpha
+                                                                             * grad[(k, ...) + tuple(self.groups[max_group].T)]
+                                                                             / group_norms[k, max_group]
+                                                                             )
+
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
+

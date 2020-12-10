@@ -390,11 +390,10 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     """
     x = x0.detach().clone()
     batch_size = x.size(0)
-
-    if not ((type(step) == float) or step == 'sublinear'):
+    if not (isinstance(step, Number) or step == 'sublinear'):
         raise ValueError("step must be a float or 'sublinear'.")
 
-    if type(step) == float:
+    if isinstance(step, Number):
         step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
 
     cert = np.inf * torch.ones(batch_size, device=x.device)
