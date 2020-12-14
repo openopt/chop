@@ -1,3 +1,4 @@
+"""Example of robust training on CIFAR10."""
 from chop.adversary import Adversary
 import torch
 from tqdm import tqdm

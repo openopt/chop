@@ -10,7 +10,6 @@ Welcome to chop's documentation!
 
    optim
    stochastic
-   sampling
    constraints
    adversary
 

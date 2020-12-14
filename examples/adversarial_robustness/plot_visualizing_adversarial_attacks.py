@@ -165,7 +165,7 @@ for k in range(batch_size):
     ax[k].plot([-trace[k] for trace in callback_nuc.trace_f])
 
 plt.tight_layout()
-plt.savefig(f"examples/plots/adversarial_examples/adv_losses_nuclear.png")
+plt.show()
 
 # Plot loss functions per datapoint
 fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
@@ -173,4 +173,4 @@ for k in range(batch_size):
     ax[k].plot([-trace[k] for trace in callback_L2.trace_f])
 
 plt.tight_layout()
-plt.savefig(f"examples/plots/adversarial_examples/adv_losses_L2.png")
+plt.show()
