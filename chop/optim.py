@@ -360,7 +360,7 @@ def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
 
 
 def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
-                         max_iter=200, callback=None):
+                         max_iter=200, callback=None, *args, **kwargs):
     """Performs the Frank-Wolfe algorithm on a batch of objectives of the form
       min_x f(x)
       s.t. x in C

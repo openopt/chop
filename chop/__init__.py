@@ -7,4 +7,5 @@ from . import constraints
 from . import penalties
 from . import data
 from . import logging
+from . import image
 from .adversary import Adversary
