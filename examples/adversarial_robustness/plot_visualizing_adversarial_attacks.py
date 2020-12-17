@@ -17,10 +17,8 @@ import chop
 from chop.image import group_patches, matplotlib_imshow_batch
 from chop.logging import Trace
 
-# Create folder for saving plots
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
 
 batch_size = 8
 
