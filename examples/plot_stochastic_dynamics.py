@@ -1,4 +1,5 @@
 """Sets up simple 2-d problems on Linf balls to see dynamics of different constrained optimization algorithms."""
+from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -30,21 +31,21 @@ def setup_problem(make_nonconvex=False):
 def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
     x = x_0.detach().clone()
     x.requires_grad = True
-    optimizer = optimizer_class([x], constraint)
+    # Use Madry's heuristic for step size
+    lr = {
+        FrankWolfe: 2.5 / iterations,
+        PGD: 2.5 * constraint.alpha / iterations * 2.,
+        PGDMadry: 2.5 / iterations
+    }
+    optimizer = optimizer_class([x], constraint, lr=lr[optimizer_class])
     iterates = [x.data.numpy().copy()]
     losses = []
-    # Use Madry's heuristic for step size
-    step_size = {
-        FrankWolfe.name: 2.5 / iterations,
-        PGD.name: 2.5 * constraint.alpha / iterations * 2.,
-        PGDMadry.name: 2.5 / iterations
-    }
 
     for _ in range(iterations):
         optimizer.zero_grad()
         loss = loss_func(x)
         loss.backward()
-        optimizer.step(step_size[optimizer.name])
+        optimizer.step()
         losses.append(loss.item())
         iterates.append(x.data.numpy().copy())
 
@@ -73,7 +74,7 @@ if __name__ == "__main__":
         ax.plot(np.arange(iterations + 1), losses_all[opt_class.name],
                 label=opt_class.name)
     fig.legend()
-    fig.savefig("examples/plots/stochastic/2-D_Linf_losses.png")
+    plt.show()
 
     fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
     for ax, opt_class in zip(axes.reshape(-1), OPTIMIZER_CLASSES):
@@ -81,5 +82,4 @@ if __name__ == "__main__":
         ax.set_xlim(-1, 1)
         ax.set_ylim(-1, 1)
         ax.legend(loc='lower left')
-
-    fig.savefig("examples/plots/stochastic/2-D_Linf_iterates.png")
+    plt.show()

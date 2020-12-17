@@ -20,7 +20,6 @@ from chop.logging import Trace
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-
 batch_size = 8
 
 # Note that this example uses load_cifar10 from the robustbench library
@@ -147,7 +146,7 @@ matplotlib_imshow_batch(abs(delta_nuc), axes=ax[6, :], normalize=True,
 
 
 plt.tight_layout()
-plt.savefig(f"examples/plots/adversarial_examples/adversarial_comparison.png")
+plt.show()
 
 
 # TODO refactor this in functions
@@ -157,7 +156,7 @@ fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
 for k in range(batch_size):
     ax[k].plot([-trace[k] for trace in callback_group.trace_f])
 plt.tight_layout()
-plt.savefig("examples/plots/adversarial_examples/adv_losses_groupLASSO.png")
+plt.show()
 
 # Plot loss functions per datapoint
 fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
@@ -165,7 +164,7 @@ for k in range(batch_size):
     ax[k].plot([-trace[k] for trace in callback_nuc.trace_f])
 
 plt.tight_layout()
-plt.savefig(f"examples/plots/adversarial_examples/adv_losses_nuclear.png")
+plt.show()
 
 # Plot loss functions per datapoint
 fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
@@ -173,4 +172,4 @@ for k in range(batch_size):
     ax[k].plot([-trace[k] for trace in callback_L2.trace_f])
 
 plt.tight_layout()
-plt.savefig(f"examples/plots/adversarial_examples/adv_losses_L2.png")
+plt.show()
