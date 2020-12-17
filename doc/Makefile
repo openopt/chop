@@ -20,4 +20,4 @@ help:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 upload:
-	gsutil cp -r _build/html/ gs://openo.pt/chop/
+	gsutil rsync -r _build/html gs://openo.pt/chop
