@@ -57,6 +57,7 @@ sphinx_gallery_conf = {
     "reference_url": {"chop": None},
 }
 
+
 mathjax_config = {
     "TeX": {
         "Macros": {

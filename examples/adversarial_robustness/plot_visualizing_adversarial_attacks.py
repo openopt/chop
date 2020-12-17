@@ -1,5 +1,11 @@
-"""This example shows how to generate and plot adversarial examples for a batch of datapoints from CIFAR-10,
-and compares the examples from different constraint sets, penalizations and solvers."""
+"""
+Visualizing Adversarial Examples
+================================
+
+This example shows how to generate and plot adversarial examples for a batch of datapoints from CIFAR-10,
+and compares the examples from different constraint sets, penalizations and solvers.
+
+"""
 
 
 from itertools import product
