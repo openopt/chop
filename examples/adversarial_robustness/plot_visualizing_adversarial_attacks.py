@@ -86,7 +86,7 @@ matplotlib_imshow_batch(abs(delta), axes=ax[4, :], normalize=True,
 print("GroupL1 constraint.")
 
 groups = group_patches(x_patch_size=8, y_patch_size=8)
-alpha = .5 * len(groups)
+alpha = 1e-1 * len(groups)
 constraint_group = chop.constraints.GroupL1Ball(alpha, groups)
 adversary_group = chop.Adversary(chop.optim.minimize_frank_wolfe)
 
@@ -113,7 +113,7 @@ matplotlib_imshow_batch(abs(delta_group), axes=ax[5, :], normalize=True,
 
 print("Nuclear norm ball adv examples")
 
-alpha = 3
+alpha = .5
 constraint_nuc = chop.constraints.NuclearNormBall(alpha)
 
 
@@ -156,7 +156,7 @@ plt.show()
 # Plot group lasso loss values
 fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
 for k in range(batch_size):
-    ax[k].plot([trace[k] for trace in callback_group.trace_f])
+    ax[k].plot([-trace[k] for trace in callback_group.trace_f])
 plt.tight_layout()
 plt.show()
 
