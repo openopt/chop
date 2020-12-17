@@ -203,7 +203,7 @@ def minimize_pgd_madry(closure, x0, prox, lmo, step=None, max_iter=200, prox_arg
         step_size = step
 
     else:
-        raise ValueError("step must be a number or a torch Tensor.")
+        raise ValueError(f"step must be a number or a torch Tensor, got {step} instead")
 
     for it in range(max_iter):
         x.requires_grad = True
@@ -391,7 +391,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     x = x0.detach().clone()
     batch_size = x.size(0)
     if not (isinstance(step, Number) or step == 'sublinear'):
-        raise ValueError("step must be a float or 'sublinear'.")
+        raise ValueError(f"step must be a float or 'sublinear', got {step} instead.")
 
     if isinstance(step, Number):
         step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
