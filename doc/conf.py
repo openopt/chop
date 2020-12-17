@@ -42,7 +42,20 @@ extensions = [
     "sphinx.ext.ifconfig",
     "sphinx.ext.mathjax",
     "sphinx.ext.linkcode",
+    "sphinx_gallery.gen_gallery",
 ]
+
+
+sphinx_gallery_conf = {
+    # path to your examples scripts
+    "examples_dirs": "../examples",
+    "doc_module": "chop",
+    # path where to save gallery generated examples
+    "gallery_dirs": "auto_examples",
+    "backreferences_dir": os.path.join("modules", "generated"),
+    "show_memory": True,
+    "reference_url": {"chop": None},
+}
 
 mathjax_config = {
     "TeX": {

@@ -1,3 +1,4 @@
+"""Benchmark of attacks."""
 import torch
 from tqdm import tqdm
 

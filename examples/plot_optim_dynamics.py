@@ -77,7 +77,7 @@ if __name__ == "__main__":
     ax.plot(losses_splitting, label="Operator Splitting")
     ax.plot(losses_fw, label="Frank-Wolfe")
     fig.legend()
-    fig.savefig("examples/plots/optim/2-D_Linf_losses.png")
+    plt.show()
 
     fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True)
     ax = ax.flatten()
@@ -101,4 +101,4 @@ if __name__ == "__main__":
     ax[3].set_ylim(-1, 1)
     ax[3].legend()
 
-    fig.savefig("examples/plots/optim/2-D_Linf_iterates.png")
+    plt.show()
