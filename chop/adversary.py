@@ -11,7 +11,7 @@ class Adversary:
         self.method = method
 
     def perturb(self, data, target, model, criterion,
-                step=None, max_iter=20,
+                max_iter=20,
                 use_best=False,
                 initializer=None,
                 callback=None,
@@ -28,10 +28,6 @@ class Adversary:
 
           model: torch.nn.Module
             model to attack
-
-          step: str or float
-            Step size strategy to use for the optimization method.
-            If float, value of the step size used.
 
           max_iter: int
             Maximum number of iterations for the optimization method.
@@ -90,7 +86,7 @@ class Adversary:
 
         cb = UseBest() if use_best else callback
 
-        sol = self.method(loss, delta0, step=step, max_iter=max_iter, 
+        sol = self.method(loss, delta0, max_iter=max_iter, 
                           *optimizer_args, callback=cb,
                           **optimizer_kwargs)
 
@@ -123,6 +119,10 @@ class Adversary:
             raise NotImplementedError("The optimization method needs to take "
                                       "arguments which may differ per "
                                       "datapoint.")
-            yield self.perturb(data, target, model, criterion, step,
+            adv_loss, delta = self.perturb(data, target, model, criterion, step,
                                max_iter, use_best, initializer, callback,
                                *optimizer_args, **optimizer_kwargs)
+
+    def run_evaluation(self, loader, model, criterion):
+        raise NotImplementedError()
+        # for adv_loss, delta in self.attack_dataset(loader, model, criterion,):
