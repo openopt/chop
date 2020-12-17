@@ -17,6 +17,7 @@ import chop
 from chop.image import group_patches, matplotlib_imshow_batch
 from chop.logging import Trace
 
+# Create folder for saving plots
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -147,7 +148,7 @@ matplotlib_imshow_batch(abs(delta_nuc), axes=ax[6, :], normalize=True,
 
 
 plt.tight_layout()
-plt.savefig(f"examples/plots/adversarial_examples/adversarial_comparison.png")
+plt.show()
 
 
 # TODO refactor this in functions
@@ -157,7 +158,7 @@ fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
 for k in range(batch_size):
     ax[k].plot([trace[k] for trace in callback_group.trace_f])
 plt.tight_layout()
-plt.savefig("examples/plots/adversarial_examples/adv_losses_groupLASSO.png")
+plt.show()
 
 # Plot loss functions per datapoint
 fig, ax = plt.subplots(figsize=(6, 10), nrows=batch_size, sharex=True)
