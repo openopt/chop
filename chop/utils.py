@@ -110,7 +110,7 @@ def bmv(tensor, vector):
 
 
 # TODO: tolerance parameter
-def power_iteration(mat, n_iter: int, tol: float):
+def power_iteration(mat, n_iter: int=10, tol: float=1e-6):
     """
     Obtains the largest singular value of a matrix, batch wise,
     and the associated left and right singular vectors.
@@ -120,21 +120,24 @@ def power_iteration(mat, n_iter: int, tol: float):
       n_iter: int
         number of iterations to perform
       tol: float
-        Tolerance
+        Tolerance. Not used for now.
     """
     # Ideally choose a random vector
     # To decrease the chance that our vector
     # Is orthogonal to the eigenvector
-    x_k = torch.normal(torch.zeros_like(mat), 1., device=mat.device)
+    *batch_shapes, m, n = mat.shape 
+    matT = torch.transpose(mat, -1, -2)
+
+    v_k = torch.normal(torch.zeros_like(mat), 1., device=mat.device)
 
     for _ in range(n_iter):
         # calculate the matrix-by-vector product Ab
-        x_k = torch.torch.matmul(mat.T, mat)
+        u_k = bmv(mat, v_k)
 
-        # calculate the norm
-        b_k1_norm = np.linalg.norm(b_k1)
+        sigma_k = torch.norm(u_k.view(-1, m), dim=-1).view(*batch_shapes)
+        u_k = bmul(u_k, 1. / sigma_k)
+        v_k = bmv(matT, u_k)
 
-        # re normalize the vector
-        b_k = b_k1 / b_k1_norm
-
-    return b_k
+        norm_vk = torch.norm(v_k.view(-1, n), dim=-1).view(*batch_shapes)
+        v_k = bmul(v_k, 1. / norm_vk)
+    return sigma_k, u_k, v_k
