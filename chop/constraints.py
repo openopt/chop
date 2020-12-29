@@ -1,3 +1,14 @@
+"""
+Constraints
+===========
+This module contains constraints.
+The methods on each constraint object function batch-wise.
+Reshaping will be of order if the constraints are used on the parameters of a model.
+
+This uses an API similar to the one for
+the COPT project, https://github.com/openopt/copt.
+Part of this code is adapted from https://github.com/ZIB-IOL."""
+
 from copy import deepcopy
 from collections import defaultdict
 
@@ -7,10 +18,6 @@ import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
 from chop import utils
-
-"""This uses an API similar to the one for
-the COPT project, https://github.com/openopt/copt.
-Part of this code is adapted from https://github.com/ZIB-IOL."""
 
 
 @torch.no_grad()

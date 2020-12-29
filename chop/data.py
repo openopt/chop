@@ -1,3 +1,10 @@
+"""
+Data utils
+===========
+
+Utility functions for data loading.
+"""
+
 from easydict import EasyDict
 
 import torch

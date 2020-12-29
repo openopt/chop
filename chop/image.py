@@ -1,4 +1,8 @@
-"""Utils functions for image manipulation and visualization"""
+"""
+Image utils
+===========
+Utility functions for image manipulation and visualization.
+"""
 
 from itertools import product
 import matplotlib.pyplot as plt

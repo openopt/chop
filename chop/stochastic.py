@@ -1,6 +1,13 @@
-"""This module contains stochastic first order optimizers.
+"""
+Full-gradient optimizers.
+=========================
+
+This module contains stochastic first order optimizers.
 These are meant to be used in replacement of optimizers such as SGD, Adam etc,
-for training a model over batches of a dataset."""
+for training a model over batches of a dataset.
+The API in this module is inspired by torch.optim.
+
+"""
 
 import warnings
 

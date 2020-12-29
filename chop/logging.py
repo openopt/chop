@@ -1,3 +1,9 @@
+"""
+Logging utils
+===============
+Utility functions and objects for logging.
+"""
+
 from datetime import datetime
 
 
