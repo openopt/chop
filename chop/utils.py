@@ -1,3 +1,9 @@
+"""
+General utility functions
+=========================
+
+"""
+
 from functools import wraps
 import torch
 
@@ -87,3 +93,48 @@ def bdot(tensor, other):
 def bmul(tensor, other):
     """Batch multiplies tensor and other"""
     return torch.mul(tensor.T, other.T).T
+
+
+def bmm(tensor, other):
+    *batch_dims, m, n = tensor.shape
+    *_, n2,  p = other.shape
+    if n2 != n:
+        raise ValueError(f"Make sure shapes are compatible. Got "
+                         f"{tensor.shape}, {other.shape}.")
+    t1 = tensor.view(-1, m, n)
+    t2 = other.view(-1, n, p)
+    return torch.bmm(t1, t2).view(*batch_dims, m, p)
+
+def bmv(tensor, vector):
+    return bmm(tensor, vector.unsqueeze(-1)).squeeze()
+
+
+# TODO: tolerance parameter
+def power_iteration(mat, n_iter: int, tol: float):
+    """
+    Obtains the largest singular value of a matrix, batch wise,
+    and the associated left and right singular vectors.
+
+    Args:
+      mat: torch.Tensor of shape (*, M, N)
+      n_iter: int
+        number of iterations to perform
+      tol: float
+        Tolerance
+    """
+    # Ideally choose a random vector
+    # To decrease the chance that our vector
+    # Is orthogonal to the eigenvector
+    x_k = torch.normal(torch.zeros_like(mat), 1., device=mat.device)
+
+    for _ in range(n_iter):
+        # calculate the matrix-by-vector product Ab
+        x_k = torch.torch.matmul(mat.T, mat)
+
+        # calculate the norm
+        b_k1_norm = np.linalg.norm(b_k1)
+
+        # re normalize the vector
+        b_k = b_k1 / b_k1_norm
+
+    return b_k

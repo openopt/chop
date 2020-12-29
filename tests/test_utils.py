@@ -60,3 +60,20 @@ def test_init_lipschitz():
     L = utils.init_lipschitz(loss_fun, X.detach().clone().requires_grad_(True))
     print(L)
 
+
+def test_bmm():
+    for _ in range(10):
+        t1 = torch.rand(4, 3, 32, 35)
+        t2 = torch.rand(4, 3, 35, 32)
+
+        res = utils.bmm(t1, t2)
+        assert res.shape == (4, 3, 32, 32)
+
+
+def test_bmv():
+    for _ in range(10):
+        mat = torch.rand(4, 3, 32, 35)
+        vec = torch.rand(4, 3, 35)
+
+        res = utils.bmv(mat, vec)
+        assert res.shape == (4, 3, 32)
