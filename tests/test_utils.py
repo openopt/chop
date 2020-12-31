@@ -6,6 +6,8 @@ from torch import nn
 from chop import utils
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
+
 # Set up random regression problem
 alpha = 1.
 n_samples, n_features = 20, 15
@@ -22,6 +24,7 @@ batch_size = 20
 d1 = 10
 d2 = 5
 x0 = torch.ones(batch_size, d1, d2)
+
 
 def test_jacobian_batch():
     def loss(x):
@@ -77,3 +80,20 @@ def test_bmv():
 
         res = utils.bmv(mat, vec)
         assert res.shape == (4, 3, 32)
+
+
+def test_power_iteration():
+    mat = torch.rand(4, 3, 32, 35)
+    mat.to(device)
+    # ground truth
+    U, S, V = torch.svd(mat)
+    u, s, v = utils.power_iteration(mat, n_iter=10)
+
+    # First singular vector should be the same
+    assert torch.allclose(S[..., 0], s, atol=1e-5), (S[..., 0] - s)
+
+    outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
+    outer_pi = u.unsqueeze(-1) * v.unsqueeze(-2)
+
+    # Rank 1 approx should be the same
+    assert torch.allclose(outer, outer_pi), (outer - outer_pi)

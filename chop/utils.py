@@ -105,6 +105,7 @@ def bmm(tensor, other):
     t2 = other.view(-1, n, p)
     return torch.bmm(t1, t2).view(*batch_dims, m, p)
 
+
 def bmv(tensor, vector):
     return bmm(tensor, vector.unsqueeze(-1)).squeeze()
 
@@ -127,17 +128,17 @@ def power_iteration(mat, n_iter: int=10, tol: float=1e-6):
     # Is orthogonal to the eigenvector
     *batch_shapes, m, n = mat.shape 
     matT = torch.transpose(mat, -1, -2)
-
-    v_k = torch.normal(torch.zeros_like(mat), 1., device=mat.device)
+    vec_shape = (*batch_shapes, n)
+    v_k = torch.normal(torch.zeros(vec_shape, device=mat.device), torch.ones(vec_shape, device=mat.device))
 
     for _ in range(n_iter):
-        # calculate the matrix-by-vector product Ab
         u_k = bmv(mat, v_k)
-
         sigma_k = torch.norm(u_k.view(-1, m), dim=-1).view(*batch_shapes)
+        # normalize u
         u_k = bmul(u_k, 1. / sigma_k)
-        v_k = bmv(matT, u_k)
 
+        v_k = bmv(matT, u_k)
         norm_vk = torch.norm(v_k.view(-1, n), dim=-1).view(*batch_shapes)
+        # normalize v
         v_k = bmul(v_k, 1. / norm_vk)
-    return sigma_k, u_k, v_k
+    return u_k, sigma_k, v_k
