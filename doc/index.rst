@@ -12,6 +12,11 @@ Welcome to chop's documentation!
    stochastic
    constraints
    adversary
+   penalties
+   utils
+   data
+   image
+   logging
 
 
 .. toctree::

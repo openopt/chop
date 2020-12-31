@@ -1,9 +1,14 @@
-"""This API is inspired by the COPT project
-https://github.com/openopt/copt.
+"""
+Full-gradient optimizers.
+=========================
 
 This module contains full gradient optimizers in PyTorch.
 These optimizers expect to be called on variables of shape (batch_size, *),
-and will perform the optimization point-wise over the batch."""
+and will perform the optimization point-wise over the batch.
+
+This API is inspired by the COPT project
+https://github.com/openopt/copt.
+"""
 
 from numbers import Number
 import warnings

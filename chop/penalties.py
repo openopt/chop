@@ -1,6 +1,9 @@
 """
+Penalties
+=========
 This module contains various penalties / regularizers.
 They function batch-wise, similar to objects in `chop.constraints`.
+Reshaping will be of order if the penalties are used on the parameters of a model.
 
 Code inspired from https://github.com/openopt/copt/
 
