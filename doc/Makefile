@@ -21,3 +21,7 @@ help:
 
 upload:
 	gsutil rsync -r _build/html gs://openo.pt/chop
+
+clean:
+	rm -rf $(BUILDDIR)/*
+	rm -rf auto_examples/
