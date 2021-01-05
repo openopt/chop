@@ -1,6 +1,6 @@
 """
-Logging utils
-===============
+Logging utilities.
+==================
 Utility functions and objects for logging.
 """
 

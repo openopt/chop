@@ -1,5 +1,5 @@
 """
-General utility functions
+General utility functions.
 =========================
 
 """

@@ -1,6 +1,6 @@
 """
-Image utils
-===========
+Image utilities.
+================
 Utility functions for image manipulation and visualization.
 """
 

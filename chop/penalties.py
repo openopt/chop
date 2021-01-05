@@ -1,13 +1,13 @@
 """
-Penalties
+Penalties.
 =========
-This module contains various penalties / regularizers.
+This module contains classes representing penalties / regularizers.
 They function batch-wise, similar to objects in `chop.constraints`.
 Reshaping will be of order if the penalties are used on the parameters of a model.
 
-Code inspired from https://github.com/openopt/copt/
+Code inspired from https://github.com/openopt/copt/.
 
-The proximal operators are derived e.g. in https://www.di.ens.fr/~fbach/opt_book.pdf
+The proximal operators are derived e.g. in https://www.di.ens.fr/~fbach/opt_book.pdf.
 """
 
 from numbers import Number

@@ -1,3 +1,9 @@
+"""
+Adversary utility classes.
+============================
+Contains classes for generating adversarial examples and evaluating models
+on adversarial examples.
+"""
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -7,7 +13,15 @@ from chop import utils
 
 
 class Adversary:
+    """
+    Class for generating adversarial examples given a model and data.
+    """
     def __init__(self, method):
+        """
+        Args:
+          method: callable
+            Optimization method to be used by the adversary.
+        """
         self.method = method
 
     def perturb(self, data, target, model, criterion,

@@ -1,7 +1,7 @@
 """
-Constraints
+Constraints.
 ===========
-This module contains constraints.
+This module contains classes representing constraints.
 The methods on each constraint object function batch-wise.
 Reshaping will be of order if the constraints are used on the parameters of a model.
 
