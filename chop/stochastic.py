@@ -1,5 +1,5 @@
 """
-Full-gradient optimizers.
+Stochastic optimizers.
 =========================
 
 This module contains stochastic first order optimizers.
