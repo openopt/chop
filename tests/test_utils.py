@@ -65,6 +65,9 @@ def test_init_lipschitz():
 
 
 def test_bmm():
+    """
+    Check shape returned by batch matmul
+    """
     for _ in range(10):
         t1 = torch.rand(4, 3, 32, 35)
         t2 = torch.rand(4, 3, 35, 32)
@@ -74,6 +77,9 @@ def test_bmm():
 
 
 def test_bmv():
+    """
+    Check shape returns of batch mat-vec multiply
+    """
     for _ in range(10):
         mat = torch.rand(4, 3, 32, 35)
         vec = torch.rand(4, 3, 35)
@@ -83,13 +89,16 @@ def test_bmv():
 
 
 def test_power_iteration():
+    """
+    Checks our power iteration method against torch.svd
+    """
     mat = torch.rand(4, 3, 32, 35)
     mat.to(device)
-    # ground truth
+    # Ground truth
     U, S, V = torch.svd(mat)
     u, s, v = utils.power_iteration(mat, n_iter=10)
 
-    # First singular vector should be the same
+    # First singular value should be the same
     assert torch.allclose(S[..., 0], s, atol=1e-5), (S[..., 0] - s)
 
     outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
