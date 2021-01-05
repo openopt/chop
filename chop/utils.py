@@ -123,22 +123,28 @@ def power_iteration(mat, n_iter: int=10, tol: float=1e-6):
       tol: float
         Tolerance. Not used for now.
     """
-    # Ideally choose a random vector
-    # To decrease the chance that our vector
-    # Is orthogonal to the eigenvector
-    *batch_shapes, m, n = mat.shape 
+    if n_iter < 1 or type(n_iter) != int:
+        raise ValueError("n_iter must be a positive integer.")
+    *batch_shapes, m, n = mat.shape
     matT = torch.transpose(mat, -1, -2)
     vec_shape = (*batch_shapes, n)
-    v_k = torch.normal(torch.zeros(vec_shape, device=mat.device), torch.ones(vec_shape, device=mat.device))
+    # Choose a random vector
+    # to decrease the chance that our
+    # initial right vector
+    # is orthogonal to the first singular vector
+    v_k = torch.normal(torch.zeros(vec_shape, device=mat.device),
+                       torch.ones(vec_shape, device=mat.device))
 
     for _ in range(n_iter):
         u_k = bmv(mat, v_k)
+        # get singular value
         sigma_k = torch.norm(u_k.view(-1, m), dim=-1).view(*batch_shapes)
         # normalize u
         u_k = bmul(u_k, 1. / sigma_k)
 
         v_k = bmv(matT, u_k)
         norm_vk = torch.norm(v_k.view(-1, n), dim=-1).view(*batch_shapes)
+
         # normalize v
         v_k = bmul(v_k, 1. / norm_vk)
     return u_k, sigma_k, v_k
