@@ -1,3 +1,9 @@
+"""
+General utility functions
+=========================
+
+"""
+
 from functools import wraps
 import torch
 
@@ -87,3 +93,58 @@ def bdot(tensor, other):
 def bmul(tensor, other):
     """Batch multiplies tensor and other"""
     return torch.mul(tensor.T, other.T).T
+
+
+def bmm(tensor, other):
+    *batch_dims, m, n = tensor.shape
+    *_, n2,  p = other.shape
+    if n2 != n:
+        raise ValueError(f"Make sure shapes are compatible. Got "
+                         f"{tensor.shape}, {other.shape}.")
+    t1 = tensor.view(-1, m, n)
+    t2 = other.view(-1, n, p)
+    return torch.bmm(t1, t2).view(*batch_dims, m, p)
+
+
+def bmv(tensor, vector):
+    return bmm(tensor, vector.unsqueeze(-1)).squeeze()
+
+
+# TODO: tolerance parameter
+def power_iteration(mat, n_iter: int=10, tol: float=1e-6):
+    """
+    Obtains the largest singular value of a matrix, batch wise,
+    and the associated left and right singular vectors.
+
+    Args:
+      mat: torch.Tensor of shape (*, M, N)
+      n_iter: int
+        number of iterations to perform
+      tol: float
+        Tolerance. Not used for now.
+    """
+    if n_iter < 1 or type(n_iter) != int:
+        raise ValueError("n_iter must be a positive integer.")
+    *batch_shapes, m, n = mat.shape
+    matT = torch.transpose(mat, -1, -2)
+    vec_shape = (*batch_shapes, n)
+    # Choose a random vector
+    # to decrease the chance that our
+    # initial right vector
+    # is orthogonal to the first singular vector
+    v_k = torch.normal(torch.zeros(vec_shape, device=mat.device),
+                       torch.ones(vec_shape, device=mat.device))
+
+    for _ in range(n_iter):
+        u_k = bmv(mat, v_k)
+        # get singular value
+        sigma_k = torch.norm(u_k.view(-1, m), dim=-1).view(*batch_shapes)
+        # normalize u
+        u_k = bmul(u_k, 1. / sigma_k)
+
+        v_k = bmv(matT, u_k)
+        norm_vk = torch.norm(v_k.view(-1, n), dim=-1).view(*batch_shapes)
+
+        # normalize v
+        v_k = bmul(v_k, 1. / norm_vk)
+    return u_k, sigma_k, v_k

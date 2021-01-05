@@ -361,13 +361,9 @@ class NuclearNormBall:
           update_direction: torch.Tensor of shape (*, m, n)
         """
         update_direction = -iterate.clone().detach()
-        # TODO: only compute FIRST singular vectors, not full SVD
-        # !!! THIS IS HIGHLY INEFFICIENT FOR NOW !!!
-        # TODO: implement power iteration
-        # get first singular vectors of grad
-        U, S, V = torch.svd(grad)
-        outer = U[..., 0].unsqueeze(-1) * V[..., 0].unsqueeze(-2)
-        update_direction += self.alpha * utils.bmul(S[..., 0], outer)
+        u, s, v = utils.power_iteration(grad)
+        outer = u.unsqueeze(-1) * v.unsqueeze(-2)
+        update_direction += self.alpha * utils.bmul(s, outer)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()

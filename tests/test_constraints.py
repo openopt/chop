@@ -9,7 +9,7 @@ def test_nuclear_norm():
     batch_size = 8
     channels = 3
     m = 32
-    n = 32
+    n = 35
     alpha = 1.
     constraint = constraints.NuclearNormBall(alpha)
 
