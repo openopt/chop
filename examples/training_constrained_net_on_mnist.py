@@ -1,4 +1,7 @@
-"""Trains a LeNet5 model on MNIST using constraints on the weights.
+"""
+Constrained neural network training.
+======================================
+Trains a LeNet5 model on MNIST using constraints on the weights.
 """
 from tqdm import tqdm
 

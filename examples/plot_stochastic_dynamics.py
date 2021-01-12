@@ -1,4 +1,9 @@
-"""Sets up simple 2-d problems on Linf balls to see dynamics of different constrained optimization algorithms."""
+"""
+Stochastic constrained optimization dynamics.
+================================================
+Sets up simple 2-d problems on Linf balls to visualize dynamics of various
+stochastic constrained optimization algorithms.
+"""
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np

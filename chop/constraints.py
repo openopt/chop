@@ -397,9 +397,10 @@ class GroupL1Ball:
         while groups[0].dim() < 2:
             groups = [group.unsqueeze(-1) for group in groups]
             
-        self.groups = groups
-
-        # keep groups as masks
+        
+        self.groups = []
+        for g in groups:
+            self.groups.append((...,) + tuple(g.T))
 
 
     @torch.no_grad()
@@ -409,9 +410,8 @@ class GroupL1Ball:
         # find group with largest L2 norm
         group_norms = []
         for g in self.groups:
-            idx = (...,) + tuple(g.T)
-            subtensor = grad[idx]
-            
+            subtensor = grad[g]
+
             group_norms.append(torch.linalg.norm(subtensor, dim=-1))
 
         group_norms = torch.stack(group_norms, dim=-1)
@@ -419,7 +419,7 @@ class GroupL1Ball:
         max_groups = torch.argmax(group_norms, dim=-1)
 
         for k, max_group in enumerate(max_groups):
-            idx = (k, ...) + tuple(self.groups[max_group].T)
+            idx = (k, *self.groups[max_group]) 
             update_direction[idx] += (self.alpha * grad[idx]
                                       / group_norms[k, max_group])
 

@@ -3,7 +3,6 @@ import torch
 import chop.constraints as constraints
 import pytest
 
-
 def test_nuclear_norm():
 
     batch_size = 8
@@ -42,12 +41,11 @@ def test_projections(constraint):
 
 
 def test_GroupL1LMO():
-    batch_size = 8
+    batch_size = 2
     alpha = 1.
-    groups = group_patches()
+    groups = group_patches(x_patch_size=2, y_patch_size=2, x_image_size=6, y_image_size=6)
     constraint = constraints.GroupL1Ball(alpha, groups)
-    data = torch.rand(batch_size, 3, 32, 32)
-    grad = torch.rand(batch_size, 3, 32, 32)
-    
+    data = torch.rand(batch_size, 3, 6, 6)
+    grad = torch.rand(batch_size, 3, 6, 6)
+
     constraint.lmo(-grad, data)
-    

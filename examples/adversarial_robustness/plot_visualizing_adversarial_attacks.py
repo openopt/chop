@@ -10,6 +10,7 @@ and compares the examples from different constraint sets, penalizations and solv
 
 from itertools import product
 
+import numpy as np
 
 import torch
 import torchvision
@@ -23,8 +24,12 @@ import chop
 from chop.image import group_patches, matplotlib_imshow_batch
 from chop.logging import Trace
 
+from sklearn.metrics import f1_score
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+from torch.autograd import profiler
+
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 batch_size = 8
 
@@ -90,66 +95,76 @@ matplotlib_imshow_batch(abs(delta), axes=ax[4, :], normalize=True,
 print("GroupL1 constraint.")
 
 groups = group_patches(x_patch_size=8, y_patch_size=8)
-alpha = 1e-1 * len(groups)
-constraint_group = chop.constraints.GroupL1Ball(alpha, groups)
-adversary_group = chop.Adversary(chop.optim.minimize_frank_wolfe)
 
-# callback_group = Trace(callable=lambda kw: criterion(model(data + kw['x']), target))
-callback_group = Trace()
+for eps in [1e-2]:
+    alpha = eps * len(groups)
+    constraint_group = chop.constraints.GroupL1Ball(alpha, groups)
+    adversary_group = chop.Adversary(chop.optim.minimize_frank_wolfe)
 
-_, delta_group = adversary_group.perturb(data, target, model, criterion,
-                                         lmo=constraint_group.lmo,
-                                         max_iter=20,
-                                         callback=callback_group)
-delta_group = image_constraint_prox(delta_group)
+    # callback_group = Trace(callable=lambda kw: criterion(model(data + kw['x']), target))
+    callback_group = Trace()
 
-# Show adversarial examples and perturbations
-adv_output_group = model(data + delta_group)
-adv_labels_group = torch.argmax(adv_output_group, dim=-1)
+    with profiler.profile() as prof:
+        _, delta_group = adversary_group.perturb(data, target, model, criterion,
+                                                lmo=constraint_group.lmo,
+                                                max_iter=20,
+                                                callback=callback_group)
 
-matplotlib_imshow_batch(data + delta_group, labels=(classes[k] for k in adv_labels_group),
-                        axes=ax[2, :],
-                        title='Group Lasso')
+    
+    delta_group = image_constraint_prox(delta_group)
 
-matplotlib_imshow_batch(abs(delta_group), axes=ax[5, :], normalize=True,
-                        title='Group Lasso')
+    # Show adversarial examples and perturbations
+    adv_output_group = model(data + delta_group)
+    adv_labels_group = torch.argmax(adv_output_group, dim=-1)
 
+    matplotlib_imshow_batch(data + delta_group, labels=(classes[k] for k in adv_labels_group),
+                            axes=ax[2, :],
+                            title='Group Lasso')
+
+    matplotlib_imshow_batch(abs(delta_group), axes=ax[5, :], normalize=True,
+                            title='Group Lasso')
+
+    print(f"F1 score: {f1_score(target.detach().cpu(), adv_labels_group.detach().cpu(), average='macro'):.3f}"
+          f" for alpha={alpha:.4f}")
 
 print("Nuclear norm ball adv examples")
 
-alpha = .5
-constraint_nuc = chop.constraints.NuclearNormBall(alpha)
+for alpha in [.2]:
+    constraint_nuc = chop.constraints.NuclearNormBall(alpha)
 
 
-def prox_nuc(delta, step_size=None):
-    delta = constraint_nuc.prox(delta, step_size)
-    delta = image_constraint_prox(delta, step_size)
-    return delta
+    def prox_nuc(delta, step_size=None):
+        delta = constraint_nuc.prox(delta, step_size)
+        delta = image_constraint_prox(delta, step_size)
+        return delta
 
 
-adversary = chop.Adversary(chop.optim.minimize_frank_wolfe)
-callback_nuc = Trace()
-_, delta_nuc = adversary.perturb(data, target, model, criterion,
+    adversary = chop.Adversary(chop.optim.minimize_frank_wolfe)
+    callback_nuc = Trace()
+
+    _, delta_nuc = adversary.perturb(data, target, model, criterion,
                                 #  prox=prox,
-                                 lmo=constraint_nuc.lmo,
-                                 max_iter=20,
+                                lmo=constraint_nuc.lmo,
+                                max_iter=20,
                                 #  step=2. / 20,
-                                 callback=callback_nuc)
+                                callback=callback_nuc)
 
-# Clamp last iterate to image space
-delta_nuc = image_constraint_prox(delta_nuc)
+    # Clamp last iterate to image space
+    delta_nuc = image_constraint_prox(delta_nuc)
 
-# Add nuclear examples to plot
-adv_output_nuc = model(data + delta_nuc)
-adv_labels_nuc = torch.argmax(adv_output_nuc, dim=-1)
+    # Add nuclear examples to plot
+    adv_output_nuc = model(data + delta_nuc)
+    adv_labels_nuc = torch.argmax(adv_output_nuc, dim=-1)
 
-matplotlib_imshow_batch(data + delta_nuc, labels=(classes[k] for k in adv_labels_nuc),
-                        axes=ax[3, :],
-                        title='Nuclear Norm')
+    matplotlib_imshow_batch(data + delta_nuc, labels=(classes[k] for k in adv_labels_nuc),
+                            axes=ax[3, :],
+                            title='Nuclear Norm')
 
-matplotlib_imshow_batch(abs(delta_nuc), axes=ax[6, :], normalize=True,
-                        title='Nuclear Norm')
+    matplotlib_imshow_batch(abs(delta_nuc), axes=ax[6, :], normalize=True,
+                            title='Nuclear Norm')
 
+    print(f"F1 score: {f1_score(target.detach().cpu(), adv_labels_nuc.detach().cpu(), average='macro'):.3f}"
+          f" for alpha={alpha:.4f}")
 
 plt.tight_layout()
 plt.show()
