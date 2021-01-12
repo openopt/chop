@@ -399,23 +399,29 @@ class GroupL1Ball:
             
         self.groups = groups
 
+        # keep groups as masks
+
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
         batch_size = iterate.size(0)
         update_direction = -iterate.detach().clone()
         # find group with largest L2 norm
-        group_norms = torch.stack([torch.linalg.norm(grad[(...,) + tuple(g.T)],
-                                                     dim=-1)
-                                   for g in self.groups]).T
+        group_norms = []
+        for g in self.groups:
+            idx = (...,) + tuple(g.T)
+            subtensor = grad[idx]
+            
+            group_norms.append(torch.linalg.norm(subtensor, dim=-1))
+
+        group_norms = torch.stack(group_norms, dim=-1)
 
         max_groups = torch.argmax(group_norms, dim=-1)
 
         for k, max_group in enumerate(max_groups):
-            update_direction[(k, ...) + tuple(self.groups[max_group].T)] += (self.alpha
-                                                                             * grad[(k, ...) + tuple(self.groups[max_group].T)]
-                                                                             / group_norms[k, max_group]
-                                                                             )
+            idx = (k, ...) + tuple(self.groups[max_group].T)
+            update_direction[idx] += (self.alpha * grad[idx]
+                                      / group_norms[k, max_group])
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
