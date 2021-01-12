@@ -37,6 +37,7 @@ def closure(f):
                 val = torch.tensor([val], device=val.device)
             return val
 
+        # Reset gradients
         x.grad = None
         return get_func_and_jac(f, x, *args, **kwargs)
 
