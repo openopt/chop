@@ -63,7 +63,7 @@ for _ in range(n_epochs):
 
     model.train()
 
-    for k, (data, target) in tqdm(enumerate(trainloader), total=len(trainloader)):
+    for k, (data, target) in enumerate(trainloader):
         data = data.to(device)
         target = target.to(device)
 
@@ -115,7 +115,7 @@ for _ in range(n_epochs):
 
     model.eval()
 
-    for k, (data, target) in tqdm(enumerate(testloader), total=len(testloader)):
+    for k, (data, target) in enumerate(testloader):
         data = data.to(device)
         target = target.to(device)
 
@@ -151,18 +151,20 @@ for _ in range(n_epochs):
         n_correct += (pred == target).sum().item()
         n_correct_adv += (pred_adv == target).sum().item()
 
-        results.test_acc.append(100. * n_correct / n_test)
-        results.test_acc_adv.append(100. * n_correct_adv / n_test)
+    results.test_acc.append(100. * n_correct / n_test)
+    results.test_acc_adv.append(100. * n_correct_adv / n_test)
 
-        print(f"Test Accuracy: {results.test_acc[-1]:.1f}%")
-        print(f"Test Adv Accuracy: {results.test_acc_adv[-1]:.1f}%")
+    print(f"Test Accuracy: {results.test_acc[-1]:.1f}%")
+    print(f"Test Adv Accuracy: {results.test_acc_adv[-1]:.1f}%")
 
 
 fig, ax = plt.subplots(nrows=2, sharex=True)
 
+ax[0].set_title("Clean data accuracies")
 ax[0].plot(results.train_acc, label='Train Acc')
 ax[0].plot(results.test_acc, label='Test Acc')
+ax[1].set_title("Adversarial data accuracies")
 ax[1].plot(results.train_acc_adv, label='Train Acc Adv')
 ax[1].plot(results.test_acc_adv, label='Test Acc Adv')
-
+plt.legend()
 plt.show()
