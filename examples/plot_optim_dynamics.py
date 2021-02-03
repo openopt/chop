@@ -10,7 +10,7 @@ import torch
 
 from chop.constraints import LinfBall
 from chop.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
-from chop import utils
+from chop import utils 
 
 torch.random.manual_seed(0)
 
