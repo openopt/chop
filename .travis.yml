@@ -22,10 +22,14 @@ install:
   - python setup.py develop
   # The following is only needed for examples and coverage tests
   - conda install matplotlib
+  - pip install tqdm
   - pip install tensorboardX cox requests
   - pip install advertorch copt
   - pip install git+https://github.com/RobustBench/robustbench
   - pip install coveralls coverage pytest-cov
+  # For sphinx
+  - pip install sphinx sphinx-gallery
+  - pip install memory_profiler
 
 script:
   - py.test -v --cov=chop
