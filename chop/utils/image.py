@@ -9,20 +9,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def matplotlib_imshow(img, one_channel=False, ax=None):
+def matplotlib_imshow(img, one_channel=False, ax=None, **kwargs):
     if ax is None:
         ax = plt
     if one_channel:
         img = img.mean(dim=0)
     npimg = img.detach().cpu().numpy()
     if one_channel:
-        ax.imshow(npimg, cmap="gray")
+        ax.imshow(npimg, cmap="gray", **kwargs)
     else:
-        ax.imshow(np.transpose(npimg, (1, 2, 0)))
+        ax.imshow(np.transpose(npimg, (1, 2, 0)), **kwargs)
 
 
 def matplotlib_imshow_batch(batch, labels=None, one_channel=False, axes=None, normalize=False, range=(0., 1.),
-                            title="", negative=False):
+                            title="", negative=False, **kwargs):
     npimgs = [img.detach().cpu().numpy() for img in batch]
     if labels is None:
         labels = [""] * batch.size(0)
@@ -31,12 +31,12 @@ def matplotlib_imshow_batch(batch, labels=None, one_channel=False, axes=None, no
         if one_channel:
             if normalize:
                 img = normalize_image(img, range, True, negative)
-            ax.imshow(img, cmap='gray')
+            ax.imshow(img, cmap='gray', **kwargs)
         else:
             img = np.transpose(img, (1, 2, 0))
             if normalize:
                 img = normalize_image(img, range, False, negative)
-            ax.imshow(img)
+            ax.imshow(img, **kwargs)
 
         ax.set_ylabel(label)
         ax.set_xticks([])

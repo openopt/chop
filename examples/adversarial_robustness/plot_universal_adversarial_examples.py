@@ -15,8 +15,8 @@ import torchvision
 # from torchvision import transforms
 # from robustbench.data import load_cifar10
 from robustbench.utils import load_model
-# from robustness.datasets import ImageNet as ImageNetRobustness
-# from robustness.model_utils import make_and_restore_model
+from robustness.datasets import ImageNet as ImageNetRobustness
+from robustness.model_utils import make_and_restore_model
 import matplotlib.pyplot as plt
 
 import chop
