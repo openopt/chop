@@ -62,7 +62,7 @@ class CIFAR10(Dataset):
         self.unnormalize = t.Normalize(-self.mean / self.std, 1. / self.std)
 
         transforms_train = [
-            t.RandomCrop(self.size, padding=self.padding),
+            t.RandomCrop(32, padding=4),
             t.RandomHorizontalFlip(),
             t.ToTensor(),
         ]
@@ -75,11 +75,11 @@ class CIFAR10(Dataset):
         Dataset.__init__(self, data_dir, transforms_train, transforms_test)
 
         self.dataset.train = torchvision.datasets.CIFAR10(root=self.data_dir, train=True,
-                                                          transform=transform_train,
+                                                          transform=self.transforms.train,
                                                           download=True)
 
         self.dataset.test = torchvision.datasets.CIFAR10(root=self.data_dir, train=False,
-                                                         transform=transform_test, download=True)
+                                                         transform=self.transforms.test, download=True)
         self.classes = {
             0: 'plane', 
             1: 'car', 
