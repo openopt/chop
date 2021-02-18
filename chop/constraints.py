@@ -225,7 +225,9 @@ class LinfBall(LpBall):
     @torch.no_grad()
     def random_point(self, shape):
         """Returns a point of given shape uniformly at random from the constraint set."""
-        return self.alpha * torch.FloatTensor(*shape).uniform_(-1, 1)
+        z = torch.zeros(*shape)
+        z.uniform_(-self.alpha, self.alpha)
+        return z
 
     @torch.no_grad()
     def lmo_pairwise(self, grad, iterate, active_set):
@@ -419,7 +421,7 @@ class GroupL1Ball:
         max_groups = torch.argmax(group_norms, dim=-1)
 
         for k, max_group in enumerate(max_groups):
-            idx = (k, *self.groups[max_group]) 
+            idx = (k, *self.groups[max_group])
             update_direction[idx] += (self.alpha * grad[idx]
                                       / group_norms[k, max_group])
 
