@@ -1,4 +1,4 @@
-from chop.image import group_patches
+from chop.utils.image import group_patches
 import torch
 import chop.constraints as constraints
 import pytest
