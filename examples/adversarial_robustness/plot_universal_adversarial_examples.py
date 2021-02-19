@@ -41,11 +41,11 @@ model = load_model('Standard')  # Can be changed to any model from the robustben
 model = NormalizingModel(model, dataset)
 
 model = model.to(device)
+
 # Attack criterion
 criterion = torch.nn.CrossEntropyLoss()
 
 n_epochs = 1
-steps_per_batch = 5
 groups = group_patches(x_patch_size=8, y_patch_size=8, x_image_size=32, y_image_size=32)
 alpha = 2e-1 * len(groups)
 
@@ -59,7 +59,7 @@ delta.requires_grad_(True)
 rho = torch.tensor([0.5]).to(device)
 rho.requires_grad_(True)
 
-constraint = chop.constraints.L1Ball(100.)
+constraint = chop.constraints.GroupL1Ball(alpha)
 delta_opt = chop.stochastic.PGDMadry([delta], constraint, lr=.05)
 rho_constraint = chop.constraints.Simplex(.5)  # rho \in [0,1]
 rho_opt = chop.stochastic.PGDMadry([rho], rho_constraint, lr=.05)
@@ -94,12 +94,15 @@ for it in range(n_epochs):
 print(f"Optimal transparency (rho) is {rho}")
 
 plt.plot(losses)
+plt.savefig("examples/plots/adversarial_examples/universal_losses.png")
 
 fig, ax = plt.subplots()
 matplotlib_imshow(delta)
+plt.savefig("examples/plots/adversarial_examples/universal_perturbation.png")
 
 
 fig, ax = plt.subplots()
 data = data.to(device)
 pert_image = data[0] + rho * (delta - data[0])
 matplotlib_imshow(pert_image)
+plt.savefig("examples/plots/adversarial_examples/universal_perturbation_on_image.png")
