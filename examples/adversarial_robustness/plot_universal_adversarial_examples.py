@@ -11,37 +11,21 @@ We solve the following problem:
 """
 
 import torch
-import torchvision
-# from torchvision import transforms
-# from robustbench.data import load_cifar10
 from robustbench.utils import load_model
-from robustness.datasets import ImageNet as ImageNetRobustness
-from robustness.model_utils import make_and_restore_model
 import matplotlib.pyplot as plt
 
 import chop
-from chop.utils.image import group_patches, matplotlib_imshow_batch
+from chop.utils.image import group_patches, matplotlib_imshow_batch, matplotlib_imshow
 from chop.utils.data import ImageNet, CIFAR10, NormalizingModel
 from chop.utils.logging import Trace
-from chop.utils import closure
-from sklearn.metrics import f1_score
-
-
 from tqdm import tqdm 
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# device = torch.device('cpu')
 
 batch_size = 100
 
-# Note that this example uses load_cifar10 from the robustbench library
-# data, target = load_cifar10(n_examples=batch_size, data_dir='~/datasets')
-
-
-# data_dir = "/scratch/data/imagenet12/"
-# dataset = ImageNet(data_dir, normalize=False)
-data_dir = "/scratch/data/"
+data_dir = "~/datasets/"
 dataset = CIFAR10(data_dir, normalize=False)
 
 loaders = dataset.loaders(batch_size, batch_size)
@@ -61,31 +45,61 @@ model = model.to(device)
 criterion = torch.nn.CrossEntropyLoss()
 
 n_epochs = 1
-steps_per_batch = 2
+steps_per_batch = 5
 groups = group_patches(x_patch_size=8, y_patch_size=8, x_image_size=32, y_image_size=32)
 alpha = 2e-1 * len(groups)
-constraint = chop.constraints.GroupL1Ball(alpha, groups)
-adversary = chop.Adversary(chop.optim.minimize_frank_wolfe)
 
-callback = Trace()
+callback_delta = Trace()
+callback_rho = Trace()
 
-delta = torch.normal(torch.zeros(1, 3, 32, 32))
+delta = torch.zeros(3, 32, 32)
+delta = delta.to(device)
 delta.requires_grad_(True)
+
+rho = torch.tensor([0.5]).to(device)
+rho.requires_grad_(True)
+
+constraint = chop.constraints.L1Ball(100.)
+delta_opt = chop.stochastic.PGDMadry([delta], constraint, lr=.05)
+rho_constraint = chop.constraints.Simplex(.5)  # rho \in [0,1]
+rho_opt = chop.stochastic.PGDMadry([rho], rho_constraint, lr=.05)
 model.eval()
+
+losses = []
+
 
 for it in range(n_epochs):
 
     for data, target in tqdm(loaders.train):
+        data = data.to(device)
+        target = target.to(device)
 
-        @closure
-        def loss_fun(delta):
-            pert_data = torch.where(delta == 0, data, delta)
+        def loss_fun(delta, rho):
+            pert_data = data + rho * (delta - data)
             return -criterion(model(pert_data), target)
 
-        algorithm = chop.optim.minimize_frank_wolfe
+        delta_opt.zero_grad()
+        rho_opt.zero_grad()
 
-        algorithm(loss_fun, delta, constraint.lmo, max_iter=steps_per_batch,
-                  callback=callback)
+        loss_val = loss_fun(delta, rho)
+        loss_val.backward()
 
-plt.plot(callback.trace_f)
-plt.savefig("universal_loss.png")
+        delta_opt.step()
+        with torch.no_grad():
+            delta = torch.clamp(delta, 0, 1)
+        rho_opt.step()
+
+        losses.append(-loss_val.item())
+
+print(f"Optimal transparency (rho) is {rho}")
+
+plt.plot(losses)
+
+fig, ax = plt.subplots()
+matplotlib_imshow(delta)
+
+
+fig, ax = plt.subplots()
+data = data.to(device)
+pert_image = data[0] + rho * (delta - data[0])
+matplotlib_imshow(pert_image)
