@@ -398,26 +398,27 @@ class GroupL1Ball:
             groups = [torch.tensor(group) for group in groups]
         while groups[0].dim() < 2:
             groups = [group.unsqueeze(-1) for group in groups]
-            
         
         self.groups = []
         for g in groups:
             self.groups.append((...,) + tuple(g.T))
 
-
-    @torch.no_grad()
-    def lmo(self, grad, iterate):
-        batch_size = iterate.size(0)
-        update_direction = -iterate.detach().clone()
-        # find group with largest L2 norm
+    def get_group_norms(self, x):
+        """Compute the vector of L2 norms within groups"""
         group_norms = []
         for g in self.groups:
-            subtensor = grad[g]
+            subtensor = x[g]
 
             group_norms.append(torch.linalg.norm(subtensor, dim=-1))
 
         group_norms = torch.stack(group_norms, dim=-1)
+        return group_norms
 
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
+        update_direction = -iterate.detach().clone()
+        # find group with largest L2 norm
+        group_norms = self.get_group_norms(grad)
         max_groups = torch.argmax(group_norms, dim=-1)
 
         for k, max_group in enumerate(max_groups):
@@ -427,3 +428,32 @@ class GroupL1Ball:
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
+
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
+        """Proximal operator for the GroupL1 constraint"""
+        
+        group_norms = self.get_group_norms(x)
+        l1ball = L1Ball(self.alpha)
+        normalized_group_norms = l1ball.prox(group_norms)
+
+        output = x.detach().clone()
+
+        # renormalize each group
+        for k, g in enumerate(self.groups):
+            renorm = normalized_group_norms[:, k] / group_norms[:, k]
+            renorm[torch.isnan(renorm)] = 1.
+            output[g] = utils.bmul(output[g], renorm)
+
+        return output
+        
+
+
+class Box:
+
+    def __init__(self, a, b):
+        self.a = a 
+        self.b = b
+
+    def prox(self, x, step_size=None):
+        return torch.clamp(x, self.a, self.b)

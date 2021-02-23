@@ -13,7 +13,7 @@ import warnings
 
 import torch
 from torch.optim import Optimizer
-
+from chop import utils
 import numpy as np
 
 
@@ -205,6 +205,64 @@ class PGDMadry(Optimizer):
         return loss
 
 
+class S3CM(Optimizer):
+    """Stochastic Three Composite Minimization (S3CM)
+    Cf
+    https://arxiv.org/abs/1701.09033
+    Yurtsever, Vu, Cevher, 2017
+    """
+    name = "S3CM"
+
+    def __init__(self, params, prox1=None, prox2=None, lr=.1):
+        if not type(lr) == float:
+            raise ValueError("lr must be a float.")
+
+        self.lr = lr
+
+        if prox1 is None:
+            def prox1(x, s=None): return x
+
+        if prox2 is None:
+            def prox2(x, s=None): return x
+
+        self.prox1 = lambda x, s: prox1(x.unsqueeze(0), s).squeeze(dim=0)
+        self.prox2 = lambda x, s: prox2(x.unsqueeze(0), s).squeeze(dim=0)
+
+        defaults = dict(lr=self.lr, prox1=self.prox1, prox2=self.prox2)
+        super(S3CM, self).__init__(params, defaults)
+
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                grad = p.grad
+                if grad.is_sparse:
+                    raise RuntimeError(
+                        'S3CM does not yet support sparse gradients.')
+                state = self.state[p]
+                # initialization
+                if len(state) == 0:
+                    state['step'] = 0
+                    state['iterate_1'] = p.clone().detach()
+                    state['iterate_2'] = self.prox2(p, self.lr)
+                    state['dual'] = (state['iterate_1'] - state['iterate_2']) / self.lr
+
+                state['iterate_2'] = self.prox2(state['iterate_1'] + self.lr * state['dual'], self.lr)
+                state['dual'].add_((state['iterate_1'] - state['iterate_2']) / self.lr)
+                state['iterate_1'] = self.prox1(state['iterate_2'] 
+                                                - self.lr * (grad + state['dual']), self.lr)
+
+                p.copy_(state['iterate_2'])
+           
+        
+
 class PairwiseFrankWolfe(Optimizer):
     """Pairwise Frank-Wolfe algorithm"""
     name = "Pairwise-FW"
@@ -232,7 +290,7 @@ class FrankWolfe(Optimizer):
     https://arxiv.org/abs/2010.07243"""
     name = 'Frank-Wolfe'
 
-    def __init__(self, params, constraint, lr=.1, momentum=.9):
+    def __init__(self, params, constraint, lr=.1, momentum=.9, normalization="gradient"):
         def _lmo(u, x):
             update_direction, max_step_size = constraint.lmo(u.unsqueeze(0), x.unsqueeze(0))
             return update_direction.squeeze(dim=0), max_step_size
@@ -242,10 +300,16 @@ class FrankWolfe(Optimizer):
             if not (0. < lr <= 1.):
                 raise ValueError("lr must be in (0., 1.].")
         self.lr = lr
-        if not(0. <= momentum <= 1.):
-            raise ValueError("Momentum must be in [0., 1.].")
+        if type(momentum) == float:
+            if not(0. <= momentum <= 1.):
+                raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
-        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
+        possible_normalizations = ('gradient', 'none')
+        if normalization not in possible_normalizations:
+            raise ValueError(f"Normalization must be in {possible_normalizations}.")
+        self.normalization = normalization
+        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, 
+                        momentum=self.momentum, normalization=self.normalization)
         super(FrankWolfe, self).__init__(params, defaults)
 
     @property
@@ -298,10 +362,13 @@ class FrankWolfe(Optimizer):
 
                 state['step'] += 1.
 
-                state['grad_estimate'] += (1. - momentum) * (grad - state['grad_estimate'])
+                state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - momentum)
                 grad_norm = torch.norm(state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
-                state['certificate'] = torch.dot(-state['grad_estimate'], update_direction)
-                step_size = min(1., step_size * grad_norm / torch.norm(update_direction))
+                state['certificate'] = utils.bdot(-state['grad_estimate'], update_direction)
+                if self.normalization == 'gradient':
+                    step_size = min(1., step_size * grad_norm / torch.norm(update_direction))
+                elif self.normalization == 'none':
+                    continue
                 p += step_size * update_direction
         return loss

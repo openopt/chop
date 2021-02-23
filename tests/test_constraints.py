@@ -22,7 +22,8 @@ def test_nuclear_norm():
                                         constraints.L2Ball,
                                         constraints.LinfBall,
                                         constraints.Simplex,
-                                        constraints.NuclearNormBall])
+                                        constraints.NuclearNormBall,
+                                        constraints.GroupL1Ball])
 def test_projections(constraint):
     """Tests that projections are true projections:
     ..math::
@@ -30,14 +31,19 @@ def test_projections(constraint):
     """
     batch_size = 8
     alpha = 1.
-    prox = constraint(alpha).prox
+    if constraint == constraints.GroupL1Ball:
+        groups = group_patches()
+        prox = constraint(alpha, groups).prox
+    else:
+        prox = constraint(alpha).prox
 
     for _ in range(10):
         data = torch.rand(batch_size, 3, 32, 32)
 
         proj_data = prox(data)
         # SVD reconstruction doesn't do better than 1e-5
-        assert prox(proj_data).allclose(proj_data, atol=1e-5)
+        double_proj = prox(proj_data)
+        assert double_proj.allclose(proj_data, atol=1e-5), (double_proj, proj_data)
 
 
 def test_GroupL1LMO():
@@ -49,3 +55,14 @@ def test_GroupL1LMO():
     grad = torch.rand(batch_size, 3, 6, 6)
 
     constraint.lmo(-grad, data)
+
+
+def test_groupL1Prox():
+    batch_size = 2
+    alpha = 10
+    groups = group_patches(x_patch_size=2, y_patch_size=2, x_image_size=6, y_image_size=6)
+    constraint = constraints.GroupL1Ball(alpha, groups)
+    data = torch.rand(batch_size, 3, 6, 6)
+
+    constraint.prox(-data, step_size=.3)
+    
