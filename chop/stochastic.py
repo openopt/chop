@@ -92,17 +92,37 @@ def backtracking_step_size(
     return step_size_t, lipschitz_t, f_next, grad_next
 
 
+def normalize_gradient(grad, normalization):
+    if normalization == 'none':
+        return grad
+    elif normalization == 'Linf':
+        grad = grad / abs(grad).max()
+
+    elif normalization == 'sign':
+        grad = torch.sign(grad)
+
+    elif normalization == 'L2':
+        grad = grad / torch.norm(grad)
+
+    return grad
+        
+
+
 class PGD(Optimizer):
     """Projected Gradient Descent"""
     name = 'PGD'
-
-    def __init__(self, params, constraint, lr=.1):
+    POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
+    
+    def __init__(self, params, constraint, lr=.1, normalization='none'):
         self.prox = lambda x: constraint.prox(x.unsqueeze(0)).squeeze()
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
         self.lr = lr
-
-        defaults = dict(prox=self.prox, name=self.name)
+        if normalization in self.POSSIBLE_NORMALIZATIONS:
+            self.normalization = normalization
+        else:
+            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
+        defaults = dict(prox=self.prox, name=self.name, normalization=self.normalization)
         super(PGD, self).__init__(params, defaults)
 
     @property
@@ -126,6 +146,9 @@ class PGD(Optimizer):
                 if p.grad is None:
                     continue
                 grad = p.grad
+
+                grad = normalize_gradient(grad, self.normalization)
+                
                 if grad.is_sparse:
                     raise RuntimeError(
                         'We do not yet support sparse gradients.')
@@ -212,12 +235,17 @@ class S3CM(Optimizer):
     Yurtsever, Vu, Cevher, 2017
     """
     name = "S3CM"
+    POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
 
-    def __init__(self, params, prox1=None, prox2=None, lr=.1):
+    def __init__(self, params, prox1=None, prox2=None, lr=.1, normalization='none'):
         if not type(lr) == float:
             raise ValueError("lr must be a float.")
 
         self.lr = lr
+        if normalization in self.POSSIBLE_NORMALIZATIONS:
+            self.normalization = normalization
+        else:
+            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
 
         if prox1 is None:
             def prox1(x, s=None): return x
@@ -228,7 +256,8 @@ class S3CM(Optimizer):
         self.prox1 = lambda x, s: prox1(x.unsqueeze(0), s).squeeze(dim=0)
         self.prox2 = lambda x, s: prox2(x.unsqueeze(0), s).squeeze(dim=0)
 
-        defaults = dict(lr=self.lr, prox1=self.prox1, prox2=self.prox2)
+        defaults = dict(lr=self.lr, prox1=self.prox1, prox2=self.prox2,
+                        normalization=self.normalization)
         super(S3CM, self).__init__(params, defaults)
 
 
@@ -243,6 +272,9 @@ class S3CM(Optimizer):
                 if p.grad is None:
                     continue
                 grad = p.grad
+
+                grad = normalize_gradient(grad, self.normalization)
+
                 if grad.is_sparse:
                     raise RuntimeError(
                         'S3CM does not yet support sparse gradients.')
