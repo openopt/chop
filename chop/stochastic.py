@@ -321,8 +321,9 @@ class FrankWolfe(Optimizer):
     We use the tricks from [Pokutta, Spiegel, Zimmer, 2020].
     https://arxiv.org/abs/2010.07243"""
     name = 'Frank-Wolfe'
+    POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, constraint, lr=.1, momentum=.9, normalization="gradient"):
+    def __init__(self, params, constraint, lr=.1, momentum=.9, normalization='none'):
         def _lmo(u, x):
             update_direction, max_step_size = constraint.lmo(u.unsqueeze(0), x.unsqueeze(0))
             return update_direction.squeeze(dim=0), max_step_size
@@ -336,9 +337,8 @@ class FrankWolfe(Optimizer):
             if not(0. <= momentum <= 1.):
                 raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
-        possible_normalizations = ('gradient', 'none')
-        if normalization not in possible_normalizations:
-            raise ValueError(f"Normalization must be in {possible_normalizations}.")
+        if normalization not in self.POSSIBLE_NORMALIZATIONS:
+            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}.")
         self.normalization = normalization
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, 
                         momentum=self.momentum, normalization=self.normalization)
@@ -397,10 +397,10 @@ class FrankWolfe(Optimizer):
                 state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - momentum)
                 grad_norm = torch.norm(state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
-                state['certificate'] = utils.bdot(-state['grad_estimate'], update_direction)
+                state['certificate'] = torch.dot(-state['grad_estimate'], update_direction)
                 if self.normalization == 'gradient':
                     step_size = min(1., step_size * grad_norm / torch.norm(update_direction))
                 elif self.normalization == 'none':
-                    continue
+                    pass
                 p += step_size * update_direction
         return loss
