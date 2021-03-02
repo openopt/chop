@@ -70,4 +70,18 @@ def test_groupL1Prox():
     data = torch.rand(batch_size, 3, 6, 6)
 
     constraint.prox(-data, step_size=.3)
-    
+
+
+def test_cone_constraint():
+    # Standard second order cone
+    u = torch.tensor([[0., 0., 1.]])
+    cos_alpha = .5
+
+    cone = constraints.Cone(u, cos_alpha)
+
+    for inp, correct_prox in [(torch.tensor([[1., 0, 0]]), torch.tensor([[.5, 0, .5]])),
+                              (torch.tensor([[0, 1., 0]]), torch.tensor([[0, .5, .5]])),
+                              (u, u),
+                              (-u, torch.zeros_like(u))
+                              ]:
+        assert cone.prox(inp).eq(correct_prox).all()

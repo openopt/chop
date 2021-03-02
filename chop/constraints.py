@@ -486,7 +486,10 @@ class Cone:
     ..math::
         \{x \in R^d,~ \|(uu^\top - Id)x\| \leq \alpha u^\top x \}
 
-    Note that :math: `\cos(\hat \alpha) = 1 / (1 + \alpha^2)`
+    Note that :math: `\cos(\hat \alpha) = 1 / (1 + \alpha^2)`.
+    
+    The standard second order cone (ice-cream cone) is given by
+    `u = (0, ..., 0, 1)`, `cos_alpha=.5`.
     """
     def __init__(self, u, cos_angle=.05):
         """
