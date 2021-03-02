@@ -457,3 +457,45 @@ class Box:
 
     def prox(self, x, step_size=None):
         return torch.clamp(x, self.a, self.b)
+
+
+class Cone:
+    """
+    Represents the second order cone of revolution centered in vector u (batch-wise), and angle alpha.
+    Formally, the set is the following:
+
+    ..math::
+        \{x \in R^d,~ \|(uu^\top - Id)x\| \leq \alpha u^\top x \}
+
+    Note that ..math:: \cos(angle) = 1 / (1 + \alpha^2)
+    """
+    def __init__(self, u, cos_angle=.05):
+        batch_size = u.size(0)
+        # normalize the cone directions
+        self.directions = utils.bmul(u, 1. / torch.norm(u.reshape(batch_size, -1), dim=-1))
+        self.cos_angle = cos_angle
+        self.alpha = np.sqrt(1. / cos_angle - 1)
+
+    def proj_u(self, x, step_size=None):
+        return utils.bmul(utils.bdot(x, self.directions), self.directions)
+
+
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
+        batch_size = x.size(0)
+        uTx = utils.bdot(self.directions, x)
+        p_u = self.proj_u(x)
+        p_orth_u = p_u - x
+        norm_p_orth_u = torch.norm(p_orth_u.reshape(batch_size, -1), dim=-1)
+        identity_idx = norm_p_orth_u <= self.alpha * uTx
+        zero_idx = self.alpha * norm_p_orth_u <= - uTx
+        project_idx = ~torch.logical_or(identity_idx, zero_idx)
+
+        res = x.detach().clone()
+        res[zero_idx] = 0.
+        res[project_idx] = utils.bmul((self.alpha * norm_p_orth_u[project_idx] + uTx[project_idx]) / (1. + self.alpha ** 2), 
+                                      (self.alpha * utils.bmul(p_orth_u[project_idx], 1 / norm_p_orth_u[project_idx])
+                                       + self.directions[project_idx]))
+
+        return res
+    

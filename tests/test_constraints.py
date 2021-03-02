@@ -3,6 +3,7 @@ import torch
 import chop.constraints as constraints
 import pytest
 
+
 def test_nuclear_norm():
 
     batch_size = 8
@@ -23,7 +24,8 @@ def test_nuclear_norm():
                                         constraints.LinfBall,
                                         constraints.Simplex,
                                         constraints.NuclearNormBall,
-                                        constraints.GroupL1Ball])
+                                        constraints.GroupL1Ball,
+                                        constraints.Cone])
 def test_projections(constraint):
     """Tests that projections are true projections:
     ..math::
@@ -34,6 +36,9 @@ def test_projections(constraint):
     if constraint == constraints.GroupL1Ball:
         groups = group_patches()
         prox = constraint(alpha, groups).prox
+    if constraint == constraints.Cone:
+        directions = torch.rand(batch_size, 3, 32, 32)
+        prox = constraint(directions, cos_angle=.2).prox
     else:
         prox = constraint(alpha).prox
 
