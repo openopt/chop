@@ -538,7 +538,7 @@ class Cone:
         batch_size = x.size(0)
         uTx = utils.bdot(self.directions, x)
         p_u = self.proj_u(x)
-        p_orth_u = p_u - x
+        p_orth_u = x - p_u
         norm_p_orth_u = torch.norm(p_orth_u.reshape(batch_size, -1), dim=-1)
         identity_idx = norm_p_orth_u <= self.alpha * uTx
         zero_idx = self.alpha * norm_p_orth_u <= - uTx
