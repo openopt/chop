@@ -446,30 +446,56 @@ class GroupL1Ball:
             output[g] = utils.bmul(output[g], renorm)
 
         return output
-        
 
 
 class Box:
-
+    """Box constraint."""
     def __init__(self, a, b):
-        self.a = a 
+        """
+        Args:
+          a: float
+            min of the box constraint
+          b: float
+            max of the box constraint
+          """
+        if b < a:
+            raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
+        self.a = a
         self.b = b
 
     def prox(self, x, step_size=None):
+        """Projection operator on the constraint.
+        Args:
+          x: torch.Tensor
+          step_size: Any
+
+        Returns:
+          x_thresh: torch.Tensor
+            x clamped between a and b.
+        """
         return torch.clamp(x, self.a, self.b)
 
 
 class Cone:
     """
-    Represents the second order cone of revolution centered in vector u (batch-wise), and angle alpha.
+    Represents second order cones of revolution centered in vector `u` (batch-wise), and angle :math: `\hat alpha`.
+    This constraint therefore really represents a batch of cones, which share the same half-angle.
+    The are all pointed in 0 (the origin).
     Formally, the set is the following:
 
     ..math::
         \{x \in R^d,~ \|(uu^\top - Id)x\| \leq \alpha u^\top x \}
 
-    Note that ..math:: \cos(angle) = 1 / (1 + \alpha^2)
+    Note that :math: `\cos(\hat \alpha) = 1 / (1 + \alpha^2)`
     """
     def __init__(self, u, cos_angle=.05):
+        """
+        Args:
+          u: torch.Tensor
+            batch-wise directions centering the cones
+          cos_angle: float
+            cosine of the half-angle of the cone.
+        """
         batch_size = u.size(0)
         # normalize the cone directions
         self.directions = utils.bmul(u, 1. / torch.norm(u.reshape(batch_size, -1), dim=-1))
@@ -477,11 +503,38 @@ class Cone:
         self.alpha = np.sqrt(1. / cos_angle - 1)
 
     def proj_u(self, x, step_size=None):
+        """
+        Projects x on self.directions batch-wise
+
+        Args:
+          x: torch.Tensor of shape (batch_size, *)
+            vectors to project
+          step_size: Any
+            Not used
+
+        Returns:
+          proj_x: torch.Tensor of shape (batch_size, *)
+            batch-wise projection of x onto self.directions
+        """
+        
         return utils.bmul(utils.bdot(x, self.directions), self.directions)
 
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """
+        Projects `x` batch-wise onto the cone constraint.
+
+        Args:
+          x: torch.Tensor of shape (batch_size, *)
+            batch of vectors to project
+          step_size: Any
+            Not used
+
+        Returns:
+          proj_x: torch.Tensor of shape (batch_size, *)
+            batch-wise projection of `x` onto the cone constraint.
+        """
         batch_size = x.size(0)
         uTx = utils.bdot(self.directions, x)
         p_u = self.proj_u(x)
@@ -498,4 +551,3 @@ class Cone:
                                        + self.directions[project_idx]))
 
         return res
-    
