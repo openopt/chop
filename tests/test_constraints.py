@@ -86,8 +86,9 @@ def test_cone_constraint():
                               ]:
         assert cone.prox(inp).eq(correct_prox).all()
 
-    x = torch.rand(*u.shape)
 
     # Moreau decomposition: x = proj_x + (x - proj_x) where these two vectors are orthogonal
-    proj_x = cone.prox(x)
-    assert (utils.bdot(x - proj_x, proj_x) == 0.).all()
+    for _ in range(10):
+        x = torch.rand(*u.shape)
+        proj_x = cone.prox(x)
+        assert utils.bdot(x - proj_x, proj_x).allclose(torch.zeros_like(x), atol=1e-7)
