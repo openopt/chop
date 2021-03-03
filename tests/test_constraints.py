@@ -2,7 +2,7 @@ from chop.utils.image import group_patches
 import torch
 import chop.constraints as constraints
 import pytest
-
+from chop import utils
 
 def test_nuclear_norm():
 
@@ -36,7 +36,7 @@ def test_projections(constraint):
     if constraint == constraints.GroupL1Ball:
         groups = group_patches()
         prox = constraint(alpha, groups).prox
-    if constraint == constraints.Cone:
+    elif constraint == constraints.Cone:
         directions = torch.rand(batch_size, 3, 32, 32)
         prox = constraint(directions, cos_angle=.2).prox
     else:
@@ -85,3 +85,9 @@ def test_cone_constraint():
                               (-u, torch.zeros_like(u))
                               ]:
         assert cone.prox(inp).eq(correct_prox).all()
+
+    x = torch.rand(*u.shape)
+
+    # Moreau decomposition: x = proj_x + (x - proj_x) where these two vectors are orthogonal
+    proj_x = cone.prox(x)
+    assert (utils.bdot(x - proj_x, proj_x) == 0.).all()

@@ -276,10 +276,10 @@ class L2Ball(LpBall):
     @torch.no_grad()
     def prox(self, x, step_size=None):
         shape = x.shape
-        norms = torch.norm(x.view(shape[0], -1), p=2, dim=-1)
+        norms = utils.bnorm(x)
         mask = norms > self.alpha
         projected = x.clone().detach()
-        projected[mask] = (projected[mask].T / norms[mask]).T
+        projected[mask] = utils.bdiv(projected[mask], norms[mask])
         return self.alpha * projected.view(shape)
 
 
