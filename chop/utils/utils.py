@@ -151,7 +151,7 @@ def power_iteration(mat, n_iter: int=10, tol: float=1e-6):
         # get singular value
         sigma_k = torch.norm(u_k.view(-1, m), dim=-1).view(*batch_shapes)
         # normalize u
-        u_k = bmul(u_k, 1. / sigma_k)
+        u_k = bdiv(u_k, sigma_k)
 
         v_k = bmv(matT, u_k)
         norm_vk = torch.norm(v_k.view(-1, n), dim=-1).view(*batch_shapes)
