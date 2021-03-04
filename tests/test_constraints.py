@@ -91,4 +91,4 @@ def test_cone_constraint():
     for _ in range(10):
         x = torch.rand(*u.shape)
         proj_x = cone.prox(x)
-        assert utils.bdot(x - proj_x, proj_x).allclose(torch.zeros_like(x), atol=1e-7)
+        assert utils.bdot(x - proj_x, proj_x).allclose(torch.zeros_like(x), atol=4e-7)
