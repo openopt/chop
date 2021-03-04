@@ -5,7 +5,7 @@ import torch
 from chop import optim
 from chop import utils
 from chop import constraints
-from chop import logging
+from chop.utils import logging
 
 import pytest
 
