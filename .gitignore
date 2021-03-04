@@ -170,3 +170,8 @@ logging/
 runs/
 **/plots/
 *.lprof
+*.png
+*.zip
+*.csv
+*.json
+*.pt
