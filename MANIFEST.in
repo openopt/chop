@@ -1,0 +1,6 @@
+include *.rst
+recursive-include doc *
+recursive-include tests *.py
+recursive-include examples *
+include COPYING
+include README.md

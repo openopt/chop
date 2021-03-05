@@ -3,7 +3,7 @@ import io
 import setuptools
 
 CLASSIFIERS = """\
-Development Status :: 2 - Pre-Alpha
+Development Status :: 3 - Alpha
 Intended Audience :: Science/Research
 Intended Audience :: Developers
 License :: OSI Approved
@@ -18,7 +18,7 @@ setup(
     name="chop",
     description="Library for continuous optimization using PyTorch",
     long_description=io.open("README.md", encoding="utf-8").read(),
-    version="0.0.1",
+    version="0.0.2",
     author="Geoffrey Negiar",
     author_email="geoffrey_negiar@berkeley.edu",
     url="http://pypi.python.org/pypi/chop-pytorch",
