@@ -17,7 +17,7 @@ import torch
 import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
-from chop import utils
+from . import utils
 
 
 @torch.no_grad()
@@ -449,14 +449,19 @@ class GroupL1Ball:
 
 
 class Box:
-    """Box constraint."""
+    """
+    Box constraint.
+
+
+    Args:
+        a: float
+        min of the box constraint
+        b: float
+        max of the box constraint
+
+    """
     def __init__(self, a, b):
         """
-        Args:
-          a: float
-            min of the box constraint
-          b: float
-            max of the box constraint
           """
         if b < a:
             raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
@@ -487,18 +492,18 @@ class Cone:
         \{x \in R^d,~ \|(uu^\top - Id)x\| \leq \alpha u^\top x \}
 
     Note that :math: `\cos(\hat \alpha) = 1 / (1 + \alpha^2)`.
-    
+
     The standard second order cone (ice-cream cone) is given by
     `u = (0, ..., 0, 1)`, `cos_alpha=.5`.
+
+
+    Args:
+        u: torch.Tensor
+        batch-wise directions centering the cones
+        cos_angle: float
+        cosine of the half-angle of the cone.
     """
     def __init__(self, u, cos_angle=.05):
-        """
-        Args:
-          u: torch.Tensor
-            batch-wise directions centering the cones
-          cos_angle: float
-            cosine of the half-angle of the cone.
-        """
         batch_size = u.size(0)
         # normalize the cone directions
         self.directions = utils.bmul(u, 1. / torch.norm(u.reshape(batch_size, -1), dim=-1))
@@ -543,8 +548,8 @@ class Cone:
         p_u = self.proj_u(x)
         p_orth_u = x - p_u
         norm_p_orth_u = torch.norm(p_orth_u.reshape(batch_size, -1), dim=-1)
-        identity_idx = norm_p_orth_u <= self.alpha * uTx
-        zero_idx = self.alpha * norm_p_orth_u <= - uTx
+        identity_idx = (norm_p_orth_u <= self.alpha * uTx)
+        zero_idx = (self.alpha * norm_p_orth_u <= - uTx)
         project_idx = ~torch.logical_or(identity_idx, zero_idx)
 
         res = x.detach().clone()
