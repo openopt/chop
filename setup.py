@@ -1,6 +1,5 @@
 from distutils.core import setup
 import io
-import setuptools
 
 CLASSIFIERS = """\
 Development Status :: 3 - Alpha
@@ -26,6 +25,6 @@ setup(
     author_email="geoffrey_negiar@berkeley.edu",
     url="http://pypi.python.org/pypi/chop-pytorch",
     packages=["chop"],
-    install_requires=["numpy", "scipy", "torch"],
+    install_requires=["numpy", "scipy", "torch", "easydict", "matplotlib", "tqdm"],
     classifiers=[_f for _f in CLASSIFIERS.split("\n") if _f],
 )
