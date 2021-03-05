@@ -23,7 +23,7 @@ setup(
     author_email="geoffrey_negiar@berkeley.edu",
     url="http://pypi.python.org/pypi/chop-pytorch",
     packages=["chop"],
-    install_requires=["numpy", "scipy", "torch"],
+    install_requires=["numpy", "scipy", "torch", "easydict", "matplotlib", "tqdm"],
     classifiers=[_f for _f in CLASSIFIERS.split("\n") if _f],
     license="New BSD License",
 )
