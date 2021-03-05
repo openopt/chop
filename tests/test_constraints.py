@@ -2,6 +2,7 @@ from chop.utils.image import group_patches
 import torch
 import chop.constraints as constraints
 import pytest
+from chop import utils
 
 def test_nuclear_norm():
 
@@ -23,7 +24,8 @@ def test_nuclear_norm():
                                         constraints.LinfBall,
                                         constraints.Simplex,
                                         constraints.NuclearNormBall,
-                                        constraints.GroupL1Ball])
+                                        constraints.GroupL1Ball,
+                                        constraints.Cone])
 def test_projections(constraint):
     """Tests that projections are true projections:
     ..math::
@@ -34,6 +36,9 @@ def test_projections(constraint):
     if constraint == constraints.GroupL1Ball:
         groups = group_patches()
         prox = constraint(alpha, groups).prox
+    elif constraint == constraints.Cone:
+        directions = torch.rand(batch_size, 3, 32, 32)
+        prox = constraint(directions, cos_angle=.2).prox
     else:
         prox = constraint(alpha).prox
 
@@ -65,4 +70,25 @@ def test_groupL1Prox():
     data = torch.rand(batch_size, 3, 6, 6)
 
     constraint.prox(-data, step_size=.3)
-    
+
+
+def test_cone_constraint():
+    # Standard second order cone
+    u = torch.tensor([[0., 0., 1.]])
+    cos_alpha = .5
+
+    cone = constraints.Cone(u, cos_alpha)
+
+    for inp, correct_prox in [(torch.tensor([[1., 0, 0]]), torch.tensor([[.5, 0, .5]])),
+                              (torch.tensor([[0, 1., 0]]), torch.tensor([[0, .5, .5]])),
+                              (u, u),
+                              (-u, torch.zeros_like(u))
+                              ]:
+        assert cone.prox(inp).eq(correct_prox).all()
+
+
+    # Moreau decomposition: x = proj_x + (x - proj_x) where these two vectors are orthogonal
+    for _ in range(10):
+        x = torch.rand(*u.shape)
+        proj_x = cone.prox(x)
+        assert utils.bdot(x - proj_x, proj_x).allclose(torch.zeros_like(x), atol=4e-7)

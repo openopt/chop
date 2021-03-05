@@ -13,7 +13,6 @@ import warnings
 
 import torch
 from torch.optim import Optimizer
-from chop import utils
 import numpy as np
 
 

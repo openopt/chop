@@ -17,7 +17,7 @@ import torch
 import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
-from chop import utils
+from . import utils
 
 
 @torch.no_grad()
@@ -276,10 +276,10 @@ class L2Ball(LpBall):
     @torch.no_grad()
     def prox(self, x, step_size=None):
         shape = x.shape
-        norms = torch.norm(x.view(shape[0], -1), p=2, dim=-1)
+        norms = utils.bnorm(x)
         mask = norms > self.alpha
         projected = x.clone().detach()
-        projected[mask] = (projected[mask].T / norms[mask]).T
+        projected[mask] = utils.bdiv(projected[mask], norms[mask])
         return self.alpha * projected.view(shape)
 
 
@@ -446,14 +446,116 @@ class GroupL1Ball:
             output[g] = utils.bmul(output[g], renorm)
 
         return output
-        
 
 
 class Box:
+    """
+    Box constraint.
 
+
+    Args:
+        a: float
+        min of the box constraint
+        b: float
+        max of the box constraint
+
+    """
     def __init__(self, a, b):
-        self.a = a 
+        """
+          """
+        if b < a:
+            raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
+        self.a = a
         self.b = b
 
     def prox(self, x, step_size=None):
+        """Projection operator on the constraint.
+        Args:
+          x: torch.Tensor
+          step_size: Any
+
+        Returns:
+          x_thresh: torch.Tensor
+            x clamped between a and b.
+        """
         return torch.clamp(x, self.a, self.b)
+
+
+class Cone:
+    """
+    Represents second order cones of revolution centered in vector `u` (batch-wise), and angle :math: `\hat alpha`.
+    This constraint therefore really represents a batch of cones, which share the same half-angle.
+    The are all pointed in 0 (the origin).
+    Formally, the set is the following:
+
+    ..math::
+        \{x \in R^d,~ \|(uu^\top - Id)x\| \leq \alpha u^\top x \}
+
+    Note that :math: `\cos(\hat \alpha) = 1 / (1 + \alpha^2)`.
+
+    The standard second order cone (ice-cream cone) is given by
+    `u = (0, ..., 0, 1)`, `cos_alpha=.5`.
+
+
+    Args:
+        u: torch.Tensor
+        batch-wise directions centering the cones
+        cos_angle: float
+        cosine of the half-angle of the cone.
+    """
+    def __init__(self, u, cos_angle=.05):
+        batch_size = u.size(0)
+        # normalize the cone directions
+        self.directions = utils.bmul(u, 1. / torch.norm(u.reshape(batch_size, -1), dim=-1))
+        self.cos_angle = cos_angle
+        self.alpha = np.sqrt(1. / cos_angle - 1)
+
+    def proj_u(self, x, step_size=None):
+        """
+        Projects x on self.directions batch-wise
+
+        Args:
+          x: torch.Tensor of shape (batch_size, *)
+            vectors to project
+          step_size: Any
+            Not used
+
+        Returns:
+          proj_x: torch.Tensor of shape (batch_size, *)
+            batch-wise projection of x onto self.directions
+        """
+        
+        return utils.bmul(utils.bdot(x, self.directions), self.directions)
+
+
+    @torch.no_grad()
+    def prox(self, x, step_size=None):
+        """
+        Projects `x` batch-wise onto the cone constraint.
+
+        Args:
+          x: torch.Tensor of shape (batch_size, *)
+            batch of vectors to project
+          step_size: Any
+            Not used
+
+        Returns:
+          proj_x: torch.Tensor of shape (batch_size, *)
+            batch-wise projection of `x` onto the cone constraint.
+        """
+        batch_size = x.size(0)
+        uTx = utils.bdot(self.directions, x)
+        p_u = self.proj_u(x)
+        p_orth_u = x - p_u
+        norm_p_orth_u = torch.norm(p_orth_u.reshape(batch_size, -1), dim=-1)
+        identity_idx = (norm_p_orth_u <= self.alpha * uTx)
+        zero_idx = (self.alpha * norm_p_orth_u <= - uTx)
+        project_idx = ~torch.logical_or(identity_idx, zero_idx)
+
+        res = x.detach().clone()
+        res[zero_idx] = 0.
+        res[project_idx] = utils.bmul((self.alpha * norm_p_orth_u[project_idx] + uTx[project_idx]) / (1. + self.alpha ** 2), 
+                                      (self.alpha * utils.bmul(p_orth_u[project_idx], 1 / norm_p_orth_u[project_idx])
+                                       + self.directions[project_idx]))
+
+        return res

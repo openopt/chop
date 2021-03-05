@@ -15,7 +15,7 @@ from numpy.core.fromnumeric import nonzero
 import torch
 import torch.nn.functional as F
 
-from chop import utils
+from . import utils
 
 
 class L1:
