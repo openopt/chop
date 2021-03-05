@@ -1,10 +1,10 @@
 """chop: constrained optimization for PyTorch"""
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
-from chop import utils
-from chop import stochastic
-from chop import optim
-from chop import constraints
-from chop import penalties
-from chop import adversary
-from chop.adversary import Adversary
+from . import utils
+from . import stochastic
+from . import optim
+from . import constraints
+from . import penalties
+from . import adversary
+from .adversary import Adversary

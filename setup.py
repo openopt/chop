@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 import io
 
 CLASSIFIERS = """\
@@ -20,11 +20,13 @@ setup(
     description="Continuous and constrained optimization with PyTorch",
     long_description=README,
     long_description_content_type='text/markdown',
-    version="0.0.2",
+    version="0.0.3",
     author="Geoffrey Negiar",
     author_email="geoffrey_negiar@berkeley.edu",
     url="http://pypi.python.org/pypi/chop-pytorch",
     packages=["chop"],
-    install_requires=["numpy", "scipy", "torch", "easydict", "matplotlib", "tqdm"],
+    install_requires=["numpy", "scipy", "torch", "torchvision",
+                      "easydict", "matplotlib", "tqdm"],
+    setup_requires=['wheel'],
     classifiers=[_f for _f in CLASSIFIERS.split("\n") if _f],
 )
