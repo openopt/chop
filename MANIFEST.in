@@ -1,6 +1,6 @@
 include *.rst
 recursive-include doc *
 recursive-include tests *.py
-recursive-include examples *
+recursive-include examples *.py README.txt
 include COPYING
 include README.md
