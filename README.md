@@ -16,9 +16,21 @@ We define stochastic optimizers in the `chop.stochastic` module. These follow Py
 
 We also define full-gradient algorithms which operate on a batch of optimization problems in the `chop.optim` module. These are used for adversarial attacks, using the `chop.Adversary` wrapper.
 
+## Installing
+
+Run the following:
+
+```
+git clone https://github.com/openopt/chop.git
+cd chop
+pip install .
+```
+
+Welcome to `chop`!
+
 ## Examples:
   
-  See `examples` directory and our [webpage](http://openo.pt/chop/auto_examples/index.html).
+See `examples` directory and our [webpage](http://openo.pt/chop/auto_examples/index.html).
 
 ## Tests
 
