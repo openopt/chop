@@ -17,7 +17,7 @@ import torch
 import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
-from . import utils
+from chop import utils
 
 
 @torch.no_grad()

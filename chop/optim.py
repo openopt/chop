@@ -16,7 +16,7 @@ import torch
 import numpy as np
 from scipy import optimize
 from numbers import Number
-from . import utils
+from chop import utils
 
 
 def minimize_three_split(

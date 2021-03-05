@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-from . import utils
+from chop import utils
 
 
 class Adversary:
