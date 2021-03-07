@@ -1,5 +1,5 @@
+from setuptools import find_packages
 from setuptools import setup
-import io
 
 CLASSIFIERS = """\
 Development Status :: 3 - Alpha
@@ -13,7 +13,8 @@ Operating System :: POSIX
 Operating System :: Unix
 """
 
-README = io.open("README.md", encoding="utf-8").read()
+with open("README.md", 'r', encoding='utf-8') as f:
+    README = f.read()
 
 setup(
     name="chop-pytorch",
@@ -24,7 +25,7 @@ setup(
     author="Geoffrey Negiar",
     author_email="geoffrey_negiar@berkeley.edu",
     url="http://pypi.python.org/pypi/chop-pytorch",
-    packages=["chop"],
+    packages=find_packages(),
     install_requires=["numpy", "scipy", "torch", "torchvision",
                       "easydict", "matplotlib", "tqdm"],
     setup_requires=['wheel'],
