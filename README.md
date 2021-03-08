@@ -21,10 +21,13 @@ We also define full-gradient algorithms which operate on a batch of optimization
 Run the following:
 
 ```
-git clone https://github.com/openopt/chop.git
-cd chop
-pip install .
+pip install chop-pytorch
 ```
+or
+```
+pip install git+https://github.com/openopt/chop.git
+```
+for the latest development version.
 
 Welcome to `chop`!
 
