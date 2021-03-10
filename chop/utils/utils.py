@@ -118,7 +118,7 @@ def bmm(tensor, other):
 
 
 def bmv(tensor, vector):
-    return bmm(tensor, vector.unsqueeze(-1)).squeeze()
+    return bmm(tensor, vector.unsqueeze(-1)).squeeze(-1)
 
 
 # TODO: tolerance parameter

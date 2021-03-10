@@ -87,6 +87,12 @@ def test_bmv():
         res = utils.bmv(mat, vec)
         assert res.shape == (4, 3, 32)
 
+        mat = torch.rand(1, 200, 500)
+        vec = torch.rand(1, 500)
+        
+        res = utils.bmv(mat, vec)
+        assert res.shape == (1, 200)
+
 
 def test_power_iteration():
     """
