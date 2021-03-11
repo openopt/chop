@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import torch
 import chop
+from chop.utils.logging import Trace
 
 u = torch.tensor([[0, 0, 1.]])
 cos_alpha = .5
@@ -21,7 +22,7 @@ def obj_fun(x):
     return ((x-torch.tensor([[0, 0, 2.]])) ** 2).sum(dim=-1)
 
 
-trace = chop.logging.Trace()
+trace = Trace()
 
 x0 = torch.rand(*u.shape)
 

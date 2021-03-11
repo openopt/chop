@@ -43,10 +43,26 @@ def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
         PGDMadry: 2.5 / iterations,
         S3CM: 2.5 / iterations
     }
-    if optimizer_class == S3CM:
-        optimizer = optimizer_class([x], prox2=constraint.prox, lr=lr[optimizer_class])
-    else:
-        optimizer = optimizer_class([x], constraint, lr=lr[optimizer_class])
+
+    prox, lmo = constraint.prox, constraint.lmo
+
+    constraint_oracles = {
+        PGD: {
+            'prox': prox
+        },
+        PGDMadry: {
+            'prox': prox,
+            'lmo': lmo
+        },
+        FrankWolfe: {
+            'lmo': lmo
+        },
+        S3CM: {
+            'prox2': prox
+        }
+    }
+
+    optimizer = optimizer_class([x], **constraint_oracles[optimizer_class], lr=lr[optimizer_class])
     iterates = [x.data.numpy().copy()]
     losses = []
 
@@ -84,7 +100,6 @@ if __name__ == "__main__":
                 label=opt_class.name)
     fig.legend()
     plt.show()
-    plt.savefig("1.png")
 
     fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
     for ax, opt_class in zip(axes.reshape(-1), OPTIMIZER_CLASSES):
@@ -93,4 +108,3 @@ if __name__ == "__main__":
         ax.set_ylim(-1, 1)
         ax.legend(loc='lower left')
     plt.show()
-    plt.savefig("2.png")

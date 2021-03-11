@@ -36,10 +36,25 @@ tol = 4e-3
 def test_L1Ball(algorithm, lr):
     # Setup
     constraint = chop.constraints.L1Ball(alpha)
+    prox = constraint.prox
+    lmo = constraint.lmo
     assert (constraint.prox(w) == w).all()
     w_t = Variable(torch.zeros_like(w), requires_grad=True)
 
-    optimizer = algorithm([w_t], constraint, lr=lr)
+    constraint_oracles = {
+        stochastic.PGD.name: {
+            'prox': prox
+        },
+        stochastic.PGDMadry.name: {
+            'prox': prox,
+            'lmo': lmo
+        },
+        stochastic.FrankWolfe.name: {
+            'lmo': lmo
+        }
+    }
+
+    optimizer = algorithm([w_t], **(constraint_oracles[algorithm.name]), lr=lr)
     criterion = torch.nn.MSELoss(reduction='mean')
 
     # Logging

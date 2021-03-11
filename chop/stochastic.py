@@ -111,9 +111,13 @@ class PGD(Optimizer):
     """Projected Gradient Descent"""
     name = 'PGD'
     POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
-    
-    def __init__(self, params, constraint, lr=.1, normalization='none'):
-        self.prox = lambda x: constraint.prox(x.unsqueeze(0)).squeeze()
+
+    def __init__(self, params, prox=None, lr=.1, normalization='none'):
+        if prox is not None:
+            self.prox = lambda x, s=None: prox(x.unsqueeze(0)).squeeze()
+        else:
+            self.prox = lambda x, s=None: x
+
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
         self.lr = lr
@@ -171,16 +175,17 @@ class PGDMadry(Optimizer):
     """What Madry et al. call PGD"""
     name = 'PGD-Madry'
 
-    def __init__(self, params, constraint, lr):
-        self.prox = lambda x: constraint.prox(x.unsqueeze(0)).squeeze()
+    def __init__(self, params, lmo, prox=None, lr=1e-2):
+        self.prox = lambda x, s=None: prox(x.unsqueeze(0), s).squeeze()
 
         def _lmo(u, x):
-            update_direction, max_step_size = constraint.lmo(u.unsqueeze(0), x.unsqueeze(0))
+            update_direction, max_step_size = lmo(u.unsqueeze(0), x.unsqueeze(0))
             return update_direction.squeeze(dim=0), max_step_size
         self.lmo = _lmo
 
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
+
         self.lr = lr
         defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
         super(PGDMadry, self).__init__(params, defaults)
@@ -252,8 +257,8 @@ class S3CM(Optimizer):
         if prox2 is None:
             def prox2(x, s=None): return x
 
-        self.prox1 = lambda x, s: prox1(x.unsqueeze(0), s).squeeze(dim=0)
-        self.prox2 = lambda x, s: prox2(x.unsqueeze(0), s).squeeze(dim=0)
+        self.prox1 = lambda x, s=None: prox1(x.unsqueeze(0), s).squeeze(dim=0)
+        self.prox2 = lambda x, s=None: prox2(x.unsqueeze(0), s).squeeze(dim=0)
 
         defaults = dict(lr=self.lr, prox1=self.prox1, prox2=self.prox2,
                         normalization=self.normalization)
@@ -298,12 +303,12 @@ class PairwiseFrankWolfe(Optimizer):
     """Pairwise Frank-Wolfe algorithm"""
     name = "Pairwise-FW"
 
-    def __init__(self, params, constraint, lr=.1, momentum=.9):
+    def __init__(self, params, lmo_pairwise, lr=.1, momentum=.9):
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
 
         def _lmo(u, x):
-            update_direction, max_step_size = constraint.lmo_pairwise(u.unsqueeze(0), x.unsqueeze(0))
+            update_direction, max_step_size = lmo_pairwise(u.unsqueeze(0), x.unsqueeze(0))
             return update_direction.squeeze(dim=0), max_step_size
         self.lmo = _lmo
         self.lr = lr
@@ -322,9 +327,9 @@ class FrankWolfe(Optimizer):
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, constraint, lr=.1, momentum=.9, normalization='none'):
+    def __init__(self, params, lmo, lr=.1, momentum=.9, normalization='none'):
         def _lmo(u, x):
-            update_direction, max_step_size = constraint.lmo(u.unsqueeze(0), x.unsqueeze(0))
+            update_direction, max_step_size = lmo(u.unsqueeze(0), x.unsqueeze(0))
             return update_direction.squeeze(dim=0), max_step_size
         self.lmo = _lmo
 
