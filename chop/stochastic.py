@@ -112,7 +112,7 @@ class PGD(Optimizer):
     name = 'PGD'
     POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
 
-    def __init__(self, params, prox=None, lr=.1, normalization='none'):
+    def __init__(self, params, prox=None, lr=.1, momentum=.9, normalization='none'):
         if prox is not None:
             self.prox = lambda x, s=None: prox(x.unsqueeze(0)).squeeze()
         else:
@@ -121,6 +121,12 @@ class PGD(Optimizer):
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
         self.lr = lr
+
+        if type(momentum) == float:
+            if not(0. <= momentum <= 1.):
+                raise ValueError("Momentum must be in [0., 1.].")
+        self.momentum = momentum
+
         if normalization in self.POSSIBLE_NORMALIZATIONS:
             self.normalization = normalization
         else:
@@ -148,24 +154,31 @@ class PGD(Optimizer):
             for p in groups['params']:
                 if p.grad is None:
                     continue
+
                 grad = p.grad
 
-                grad = normalize_gradient(grad, self.normalization)
-                
                 if grad.is_sparse:
                     raise RuntimeError(
                         'We do not yet support sparse gradients.')
+
                 state = self.state[p]
+                # Initialization
                 if len(state) == 0:
                     state['step'] = 0.
+                    state['grad_estimate'] = torch.zeros_like(
+                        p, memory_format=torch.preserve_format)
+
                 state['step'] += 1.
+                state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - self.momentum)
+
+                grad_est = normalize_gradient(state['grad_estimate'], self.normalization)
 
                 if self.lr == 'sublinear':
                     step_size = 1. / (state['step'] + 1.)
                 else:
                     step_size = self.lr
 
-                new_p = self.prox(p - step_size * grad)
+                new_p = self.prox(p - step_size * grad_est, 1.)
                 state['certificate'] = torch.norm((p - new_p) / step_size)
                 p.copy_(new_p)
         return loss
@@ -399,11 +412,11 @@ class FrankWolfe(Optimizer):
                 state['step'] += 1.
 
                 state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - momentum)
-                grad_norm = torch.norm(state['grad_estimate'])
                 update_direction, _ = self.lmo(-state['grad_estimate'], p)
                 state['certificate'] = torch.dot(-state['grad_estimate'], update_direction)
                 if self.normalization == 'gradient':
-                    step_size = min(1., step_size * grad_norm / torch.norm(update_direction))
+                    grad_norm = torch.norm(state['grad_estimate'])
+                    step_size = min(1., step_size * grad_norm / torch.linalg.norm(update_direction))
                 elif self.normalization == 'none':
                     pass
                 p += step_size * update_direction
