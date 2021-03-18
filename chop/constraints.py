@@ -365,7 +365,7 @@ class NuclearNormBall:
         update_direction = -iterate.clone().detach()
         u, s, v = utils.power_iteration(grad)
         outer = u.unsqueeze(-1) * v.unsqueeze(-2)
-        update_direction += self.alpha * utils.bmul(s, outer)
+        update_direction += self.alpha * outer
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
