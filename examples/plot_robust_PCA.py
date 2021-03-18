@@ -38,14 +38,21 @@ M = L + S
 def sqloss(Z):
     return .5 * torch.linalg.norm((Z - M).squeeze(), ord='fro') ** 2
 
-rank_constraint = chop.constraints.NuclearNormBall(torch.linalg.norm(L.squeeze(), ord='nuc'))
-sparsity_constraint = chop.constraints.L1Ball(abs(S).sum())
+rnuc = torch.linalg.norm(L.squeeze(), ord='nuc')
+sL1 = abs(S).sum()
+
+print(f"Initial sparsity: {sL1}")
+print(f"Initial nuclear norm: {rnuc}")
+
+rank_constraint = chop.constraints.NuclearNormBall(rnuc)
+sparsity_constraint = chop.constraints.L1Ball(sL1)
 
 
 lmo = rank_constraint.lmo
 prox = sparsity_constraint.prox
 
-callback = Trace(log_x=False)
+callback = Trace(log_x=False, callable=lambda kwargs: (torch.linalg.norm(kwargs['y'].squeeze(), ord='nuc').item(),
+                                                           abs(kwargs['x']).sum().item()))
 
 result = chop.optim.minimize_alternating_fw_prox(sqloss, torch.zeros_like(M), torch.zeros_like(M),
                                                  prox=prox, lmo=lmo,
@@ -53,7 +60,18 @@ result = chop.optim.minimize_alternating_fw_prox(sqloss, torch.zeros_like(M), to
                                                  callback=callback)
 
 
-plt.plot(callback.trace_f)
+f_vals = callback.trace_f
+low_rank_nuc, sparse_comp = zip(*callback.trace_callable)
+
+fig, axes = plt.subplots(3)
+axes[0].plot(callback.trace_f)
+axes[0].set_title("Function values")
+
+axes[1].plot(sparse_comp)
+axes[1].set_title("L1 norm of sparse component")
+
+axes[2].plot(low_rank_nuc)
+axes[2].set_title("Nuclear Norm of low rank component")
 # plt.yscale('log')
 plt.tight_layout()
 plt.show()

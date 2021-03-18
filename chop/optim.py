@@ -430,7 +430,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad,
                                    certificate=cert)
 
-def minimize_alternating_fw_prox(closure, x0, y0, prox, lmo, L0=1e-3,
+def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
                                  step='sublinear', max_iter=200, callback=None,
                                  *args, **kwargs):
     """
@@ -500,6 +500,7 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox, lmo, L0=1e-3,
     if isinstance(step, Number):
         step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
 
+    # TODO: add error catching for L0
     Lt = L0
 
     for it in range(max_iter):
@@ -511,23 +512,22 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox, lmo, L0=1e-3,
         y.requires_grad_(True)
         z = x + y
 
-
-        print(f"Sparsity: {abs(x).sum()}")
-        print(f"Nuc Norm: {torch.linalg.norm(y.squeeze())}")
+        f_val, grad = closure(z)
 
         # estimate Lipschitz constant with backtracking line search
         Lt = utils.init_lipschitz(closure, z, L0=Lt)
-        f_val, grad = closure(z)
 
         y_update, max_step_size = lmo(-grad, y)
+        w = y_update + y
         prox_step_size = utils.bmul(step_size, Lt)
-        v = prox(z - utils.bmul(prox_step_size, grad), prox_step_size)
+        # v = prox(z - w - utils.bmul(prox_step_size, grad), prox_step_size)
+        v = prox(z - w - grad, prox_step_size)
 
 
         with torch.no_grad():
             step_size = torch.min(step_size, max_step_size)
             y += utils.bmul(step_size, y_update)
-            x_update = x - v
+            x_update = v - x
             x += utils.bmul(step_size, x_update)
 
         if callback is not None:
