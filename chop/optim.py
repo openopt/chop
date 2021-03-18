@@ -392,6 +392,11 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
       callback: callable
         (optional) Any callable called on locals() at the end of each iteration.
         Often used for logging.
+
+    Returns:
+      
+      result: optimize.OptimizeResult object
+        Holds the result of the optimization, and certificates of convergence.
     """
     x = x0.detach().clone()
     batch_size = x.size(0)
@@ -424,3 +429,111 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     fval, grad = closure(x)
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad,
                                    certificate=cert)
+
+def minimize_alternating_fw_prox(closure, x0, y0, prox, lmo, L0=1e-3,
+                                 step='sublinear', max_iter=200, callback=None,
+                                 *args, **kwargs):
+    """
+    Implements algorithm from [Garber et al. 2018]
+    https://arxiv.org/abs/1802.05581
+
+    to solve the following problem
+
+
+    ..math::
+        \min_{x, y} f(x + y) + R_x(x) + R_y(y).
+
+    We suppose that $f$ is $L$-smooth and that
+    we have access to the following operators:
+    
+      - a generalized LMO for $R_y$: 
+    ..math::
+        gLMO(w) = \text{argmin}_w R_y(w) + \langle w, \nabla f(x_t + y_t) \rangle
+
+      - a prox operator for $R_x$:
+    ..math::
+        prox(v) = \text{argmin}_v R_x(v) + \langle v, \nabla f(x_t+ y_t) \rangle + \frac{\gamma_t L}{2} \|v + w_t - (x_t + y_t)\|^2
+    
+    Args:
+      x0: torch.Tensor of shape (batch_size, *)
+        starting point for x
+
+      y0: torch.Tensor of shape (batch_size, *)
+        starting point for y
+      
+      prox: function
+        proximal operator for R_x
+
+      lmo: function
+        generalized LMO operator for R_y. If R_y is an indicator function,
+        it reduces to the usual LMO operator.
+
+      L0: float
+        initial guess of the lipschitz constant of f
+
+      step: float or 'sublinear'
+        step-size scheme to be used.
+
+      max_iter: int
+        max number of iterations.
+
+      callback: callable
+        (optional) Any callable called on locals() at the end of each iteration.
+        Often used for logging.
+    
+    Returns:
+      
+      result: optimize.OptimizeResult object
+        Holds the result of the optimization, and certificates of convergence.
+    """
+
+    x = x0.detach().clone()
+    y = y0.detach().clone()
+    batch_size = x.size(0)
+
+    if x.shape != y.shape:
+        raise ValueError(f"x, y should have the same shape. Got {x.shape}, {y.shape}.")
+
+    if not (isinstance(step, Number) or step == 'sublinear'):
+        raise ValueError(f"step must be a float or 'sublinear', got {step} instead.")
+
+    if isinstance(step, Number):
+        step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
+
+    Lt = L0
+
+    for it in range(max_iter):
+
+        if step == 'sublinear':
+            step_size = 2. / (it + 2) * torch.ones(batch_size)
+
+        x.requires_grad_(True)
+        y.requires_grad_(True)
+        z = x + y
+
+
+        print(f"Sparsity: {abs(x).sum()}")
+        print(f"Nuc Norm: {torch.linalg.norm(y.squeeze())}")
+
+        # estimate Lipschitz constant with backtracking line search
+        Lt = utils.init_lipschitz(closure, z, L0=Lt)
+        f_val, grad = closure(z)
+
+        y_update, max_step_size = lmo(-grad, y)
+        prox_step_size = utils.bmul(step_size, Lt)
+        v = prox(z - utils.bmul(prox_step_size, grad), prox_step_size)
+
+
+        with torch.no_grad():
+            step_size = torch.min(step_size, max_step_size)
+            y += utils.bmul(step_size, y_update)
+            x_update = x - v
+            x += utils.bmul(step_size, x_update)
+
+        if callback is not None:
+            if callback(locals()) is False:
+                break
+
+    fval, grad = closure(x + y)
+    result = optimize.OptimizeResult(x=x, y=y, nit=it, fval=fval, grad=grad, certificate=None)
+    return result

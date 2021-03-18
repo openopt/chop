@@ -17,7 +17,10 @@ def get_func_and_jac(func, x, *args, **kwargs):
     by Shane Baratt"""
 
     batch_size = x.size(0)
-    x.requires_grad = True
+    if x.is_leaf:
+        x.requires_grad_(True)
+    else:
+        x.retain_grad()
     output = func(x, *args, **kwargs)
     if output.dim() == 0:
         output = output.unsqueeze(0)
@@ -102,9 +105,9 @@ def bdiv(tensor, other):
 
 
 def bnorm(tensor, *args, **kwargs):
-    """Batch vectors norms for tensor"""
+    """Batch vector norms for tensor"""
     batch_size = tensor.size(0)
-    return torch.norm(tensor.reshape(batch_size, -1), dim=-1, *args, **kwargs)
+    return torch.linalg.norm(tensor.reshape(batch_size, -1), dim=-1, *args, **kwargs)
 
 def bmm(tensor, other):
     *batch_dims, m, n = tensor.shape
