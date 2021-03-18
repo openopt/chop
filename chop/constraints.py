@@ -265,7 +265,7 @@ class L1Ball(LpBall):
         shape = x.shape
         flattened_x = x.view(shape[0], -1)
         # TODO vectorize this
-        projected = [euclidean_proj_l1ball(row) for row in flattened_x]
+        projected = [euclidean_proj_l1ball(row, s=self.alpha) for row in flattened_x]
         x = torch.stack(projected)
         return x.view(*shape)
 
