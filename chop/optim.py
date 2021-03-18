@@ -506,7 +506,7 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
     for it in range(max_iter):
 
         if step == 'sublinear':
-            step_size = 2. / (it + 2) * torch.ones(batch_size)
+            step_size = 2. / (it + 2) * torch.ones(batch_size, device=x.device)
 
         x.requires_grad_(True)
         y.requires_grad_(True)
@@ -518,7 +518,8 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
         Lt = utils.init_lipschitz(closure, z, L0=Lt)
 
         y_update, max_step_size = lmo(-grad, y)
-        w = y_update + y
+        with torch.no_grad():
+            w = y_update + y
         prox_step_size = utils.bmul(step_size, Lt)
         # v = prox(z - w - utils.bmul(prox_step_size, grad), prox_step_size)
         v = prox(z - w - grad, prox_step_size)

@@ -17,6 +17,9 @@ import chop
 from chop import utils
 from chop.utils.logging import Trace
 
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 m = 1000
 n = 1000
 r = 5
@@ -33,6 +36,7 @@ S = 10 * torch.normal(torch.zeros(1, m, n))
 S *= torch.bernoulli(p * torch.ones_like(S))
 
 M = L + S
+M = M.to(device)
 
 @utils.closure
 def sqloss(Z):
@@ -51,12 +55,15 @@ sparsity_constraint = chop.constraints.L1Ball(sL1)
 lmo = rank_constraint.lmo
 prox = sparsity_constraint.prox
 
-callback = Trace(log_x=False, callable=lambda kwargs: (torch.linalg.norm(kwargs['y'].squeeze(), ord='nuc').item(),
-                                                           abs(kwargs['x']).sum().item()))
+callback = Trace(log_x=False, callable=lambda kwargs: (
+    torch.linalg.norm(kwargs['y'].squeeze(), ord='nuc').item(),
+    abs(kwargs['x']).sum().item()),
 
-result = chop.optim.minimize_alternating_fw_prox(sqloss, torch.zeros_like(M), torch.zeros_like(M),
+                 freq=2)
+
+result = chop.optim.minimize_alternating_fw_prox(sqloss, torch.zeros_like(M, device=device), torch.zeros_like(M, device=device),
                                                  prox=prox, lmo=lmo,
-                                                 L0=1., max_iter=200,
+                                                 L0=1., max_iter=100,
                                                  callback=callback)
 
 
@@ -64,7 +71,7 @@ f_vals = callback.trace_f
 low_rank_nuc, sparse_comp = zip(*callback.trace_callable)
 
 fig, axes = plt.subplots(3)
-axes[0].plot(callback.trace_f)
+axes[0].plot([val.cpu().item() for val in callback.trace_f])
 axes[0].set_title("Function values")
 
 axes[1].plot(sparse_comp)
@@ -77,5 +84,5 @@ plt.tight_layout()
 plt.show()
 plt.savefig("robustPCA.png")
 
-print(f"Sparsity: {abs(result.y).sum()}")
-print(f"Nuc Norm: {torch.linalg.norm(result.x.squeeze())}")
+print(f"Sparsity: {abs(result.x).sum()}")
+print(f"Nuc Norm: {torch.linalg.norm(result.y.squeeze(), ord='nuc')}")
