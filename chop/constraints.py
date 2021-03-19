@@ -352,7 +352,7 @@ class NuclearNormBall:
         Returns :math: `s - $iterate$` where
         
           ..math::
-            s = \argmin_u u^\top grad.
+            s = \argmax_u u^\top grad.
 
         Args:
           grad: torch.Tensor of shape (*, m, n)
@@ -363,7 +363,7 @@ class NuclearNormBall:
           update_direction: torch.Tensor of shape (*, m, n)
         """
         update_direction = -iterate.clone().detach()
-        u, s, v = utils.power_iteration(grad)
+        u, _, v = utils.power_iteration(grad)
         outer = u.unsqueeze(-1) * v.unsqueeze(-2)
         update_direction += self.alpha * outer
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
@@ -446,6 +446,10 @@ class GroupL1Ball:
             output[g] = utils.bmul(output[g], renorm)
 
         return output
+
+    def is_feasible(self, x, tol=5e-7):
+        group_norms = self.get_group_norms(x)
+        return (torch.linalg.norm(group_norms, ord=1, dim=-1) <= self.alpha + tol).all()
 
 
 class Box:
