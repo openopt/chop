@@ -4,7 +4,6 @@ Constraints.
 This module contains classes representing constraints.
 The methods on each constraint object function batch-wise.
 Reshaping will be of order if the constraints are used on the parameters of a model.
-
 This uses an API similar to the one for
 the COPT project, https://github.com/openopt/copt.
 Part of this code is adapted from https://github.com/ZIB-IOL."""
@@ -71,7 +70,6 @@ def euclidean_proj_simplex(v, s=1.):
   Solves the optimization problem (using the algorithm from [1]):
     ..math::
       min_w 0.5 * || w - v ||_2^2 , s.t. \sum_i w_i = s, w_i >= 0
-
   Parameters
   ----------
   v: (n,) numpy array,
@@ -350,15 +348,13 @@ class NuclearNormBall:
         """
         Computes the LMO for the Nuclear Norm Ball on the last two dimensions.
         Returns :math: `s - $iterate$` where
-        
+
           ..math::
             s = \argmax_u u^\top grad.
 
         Args:
           grad: torch.Tensor of shape (*, m, n)
-
           iterate: torch.Tensor of shape (*, m, n)
-
         Returns:
           update_direction: torch.Tensor of shape (*, m, n)
         """
@@ -455,14 +451,11 @@ class GroupL1Ball:
 class Box:
     """
     Box constraint.
-
-
     Args:
         a: float
         min of the box constraint
         b: float
         max of the box constraint
-
     """
     def __init__(self, a, b):
         """
@@ -477,7 +470,6 @@ class Box:
         Args:
           x: torch.Tensor
           step_size: Any
-
         Returns:
           x_thresh: torch.Tensor
             x clamped between a and b.
@@ -491,16 +483,11 @@ class Cone:
     This constraint therefore really represents a batch of cones, which share the same half-angle.
     The are all pointed in 0 (the origin).
     Formally, the set is the following:
-
     ..math::
         \{x \in R^d,~ \|(uu^\top - Id)x\| \leq \alpha u^\top x \}
-
     Note that :math: `\cos(\hat \alpha) = 1 / (1 + \alpha^2)`.
-
     The standard second order cone (ice-cream cone) is given by
     `u = (0, ..., 0, 1)`, `cos_alpha=.5`.
-
-
     Args:
         u: torch.Tensor
         batch-wise directions centering the cones
@@ -517,13 +504,11 @@ class Cone:
     def proj_u(self, x, step_size=None):
         """
         Projects x on self.directions batch-wise
-
         Args:
           x: torch.Tensor of shape (batch_size, *)
             vectors to project
           step_size: Any
             Not used
-
         Returns:
           proj_x: torch.Tensor of shape (batch_size, *)
             batch-wise projection of x onto self.directions
@@ -536,13 +521,11 @@ class Cone:
     def prox(self, x, step_size=None):
         """
         Projects `x` batch-wise onto the cone constraint.
-
         Args:
           x: torch.Tensor of shape (batch_size, *)
             batch of vectors to project
           step_size: Any
             Not used
-
         Returns:
           proj_x: torch.Tensor of shape (batch_size, *)
             batch-wise projection of `x` onto the cone constraint.
