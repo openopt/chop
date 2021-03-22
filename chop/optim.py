@@ -431,7 +431,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
                                    certificate=cert)
 
 
-def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
+def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, lipschitz=1e-3,
                                  step='sublinear', line_search=None, max_iter=200, callback=None,
                                  *args, **kwargs):
     """
@@ -469,7 +469,7 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
         generalized LMO operator for R_y. If R_y is an indicator function,
         it reduces to the usual LMO operator.
 
-      L0: float
+      lipschitz: float
         initial guess of the lipschitz constant of f
 
       step: float or 'sublinear'
@@ -502,7 +502,7 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
         step_size = step * torch.ones(batch_size, device=x.device, dtype=x.dtype)
 
     # TODO: add error catching for L0
-    Lt = L0
+    Lt = lipschitz
 
     for it in range(max_iter):
 
@@ -539,5 +539,6 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
                 break
 
     fval, grad = closure(x + y)
+    # TODO: add a certificate of optimality
     result = optimize.OptimizeResult(x=x, y=y, nit=it, fval=fval, grad=grad, certificate=None)
     return result
