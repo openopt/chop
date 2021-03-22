@@ -14,9 +14,6 @@ Welcome to chop's documentation!
    adversary
    penalties
    utils
-   data
-   image
-   logging
 
 
 .. toctree::
