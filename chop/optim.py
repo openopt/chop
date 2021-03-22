@@ -430,8 +430,9 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad,
                                    certificate=cert)
 
+
 def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
-                                 step='sublinear', max_iter=200, callback=None,
+                                 step='sublinear', line_search=None, max_iter=200, callback=None,
                                  *args, **kwargs):
     """
     Implements algorithm from [Garber et al. 2018]
@@ -521,12 +522,14 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, L0=1e-3,
         with torch.no_grad():
             w = y_update + y
         prox_step_size = utils.bmul(step_size, Lt)
-        # v = prox(z - w - utils.bmul(prox_step_size, grad), prox_step_size)
-        v = prox(z - w - grad, prox_step_size)
-
+        v = prox(z - w - utils.bdiv(grad, prox_step_size), prox_step_size)
 
         with torch.no_grad():
-            step_size = torch.min(step_size, max_step_size)
+            if line_search is None:
+                step_size = torch.min(step_size, max_step_size)
+            else:
+                step_size = line_search(locals())
+
             y += utils.bmul(step_size, y_update)
             x_update = v - x
             x += utils.bmul(step_size, x_update)

@@ -87,7 +87,8 @@ def init_lipschitz(closure, x0, L0=1e-3, n_it=100):
 
 def bdot(tensor, other):
     """Returns the batch-wise dot product between tensor and other.
-    Supposes that the shapes are (batch_size, *)"""
+    Supposes that the shapes are (batch_size, *).
+    This includes matrix inner products."""
 
     t1 = tensor.view(tensor.size(0), -1)
     t2 = other.view(other.size(0), -1)

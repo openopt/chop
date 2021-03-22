@@ -19,6 +19,7 @@ from chop.utils.logging import Trace
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 m = 1000
 n = 1000
@@ -28,14 +29,18 @@ p = 0.001
 U = torch.normal(torch.zeros(1, m, r))
 V = torch.normal(torch.zeros(1, r, n))
 
-# low rank part
+# Low rank component
 L = 10 * utils.bmm(U, V)
 
-S = 10 * torch.normal(torch.zeros(1, m, n))
+# Sparse component
+S = 100 * torch.normal(torch.zeros(1, m, n))
 
-S *= torch.bernoulli(p * torch.ones_like(S))
+S *= (torch.rand_like(S) <= p)
 
-M = L + S
+# Add noise
+N = torch.normal(torch.zeros(1, m, n))
+
+M = L + S + N
 M = M.to(device)
 
 @utils.closure
@@ -55,23 +60,46 @@ sparsity_constraint = chop.constraints.L1Ball(sL1)
 lmo = rank_constraint.lmo
 prox = sparsity_constraint.prox
 
-callback = Trace(log_x=False, callable=lambda kwargs: (
-    torch.linalg.norm(kwargs['y'].squeeze(), ord='nuc').item(),
-    abs(kwargs['x']).sum().item()),
 
-                 freq=2)
+def things_to_log(kwargs):
+    result = (
+        torch.linalg.norm(kwargs['y'].squeeze(), ord='nuc').item(),
+        abs(kwargs['x']).sum().item(),
+        sqloss(kwargs['x'] + kwargs['y'])[0].item()
+    )
+    return result
+
+
+callback = Trace(log_x=False, callable=things_to_log)
+
+
+def line_search(kwargs):
+    x = kwargs['x']
+    y = kwargs['y']
+    w = kwargs['w']
+    v = kwargs['v']
+    q = w + v
+    z = x + y
+    B = M - z
+    A = q - z
+
+    step_size = torch.clamp(utils.bdiv(utils.bdot(A, B), utils.bdot(A, A)), max=1.)
+    assert (step_size >= 0).all(), 'WTF'
+    return step_size
+
 
 result = chop.optim.minimize_alternating_fw_prox(sqloss, torch.zeros_like(M, device=device), torch.zeros_like(M, device=device),
                                                  prox=prox, lmo=lmo,
-                                                 L0=1., max_iter=100,
+                                                 L0=1.,
+                                                 line_search=line_search,
+                                                 max_iter=200,
                                                  callback=callback)
 
 
-f_vals = callback.trace_f
-low_rank_nuc, sparse_comp = zip(*callback.trace_callable)
+low_rank_nuc, sparse_comp, f_vals = zip(*callback.trace_callable)
 
-fig, axes = plt.subplots(3)
-axes[0].plot([val.cpu().item() for val in callback.trace_f])
+fig, axes = plt.subplots(3, sharex=True, figsize=(12, 4))
+axes[0].plot(f_vals)
 axes[0].set_title("Function values")
 
 axes[1].plot(sparse_comp)
@@ -79,10 +107,10 @@ axes[1].set_title("L1 norm of sparse component")
 
 axes[2].plot(low_rank_nuc)
 axes[2].set_title("Nuclear Norm of low rank component")
-# plt.yscale('log')
+
+
 plt.tight_layout()
 plt.show()
-plt.savefig("robustPCA.png")
 
 print(f"Sparsity: {abs(result.x).sum()}")
 print(f"Nuc Norm: {torch.linalg.norm(result.y.squeeze(), ord='nuc')}")
