@@ -41,7 +41,7 @@ jobs:
         sudo python setup.py develop
     - name: Dependencies needed for coverage and unit tests
       run: |
-        conda install matplotlib
+        pip install matplotlib
         pip install
         pip install tensorboardX cox requests
         pip install advertorch copt
