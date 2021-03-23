@@ -34,14 +34,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Setting up -conda
-      uses: s-weigand/setup-conda@v1
     - name: Installing environment and dependencies
       run: |
         $CONDA/bin/conda env update --file environment.yml --name base
     - name: Activating conda env
       run: |
-        conda activate base
+        $CONDA/bin/conda activate base
     - name: Install package
       run: |
         sudo python setup.py develop
