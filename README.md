@@ -48,7 +48,7 @@ If this software is useful to your research, please consider citing it as
   author       = {Geoffrey Negiar, Fabian Pedregosa},
   title        = {CHOP: continuous optimization built on Pytorch},
   year         = 2020,
-  url          = {http://github.com/openopt/chop}
+  url          = {https://github.com/openopt/chop}
 }
 ```
 
