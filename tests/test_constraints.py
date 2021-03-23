@@ -4,6 +4,7 @@ import chop.constraints as constraints
 import pytest
 from chop import utils
 
+
 def test_nuclear_norm():
 
     batch_size = 8
@@ -86,9 +87,38 @@ def test_cone_constraint():
                               ]:
         assert cone.prox(inp).eq(correct_prox).all()
 
-
-    # Moreau decomposition: x = proj_x + (x - proj_x) where these two vectors are orthogonal
+    # Moreau decomposition: x = proj_x + (x - proj_x) where
+    # the two vectors are orthogonal
     for _ in range(10):
         x = torch.rand(*u.shape)
         proj_x = cone.prox(x)
         assert utils.bdot(x - proj_x, proj_x).allclose(torch.zeros_like(x), atol=4e-7)
+
+
+@pytest.mark.parametrize('Constraint', [constraints.L1Ball,
+                                        constraints.L2Ball,
+                                        constraints.LinfBall,
+                                        constraints.Simplex,
+                                        constraints.NuclearNormBall,
+                                        constraints.GroupL1Ball,
+                                        constraints.Cone])
+@pytest.mark.parametrize('alpha', [.1, 1., 20.])
+def test_feasible(Constraint, alpha):
+    """Tests if prox and LMO yield feasible points"""
+    # TODO: implement feasibility check method in each constraint.
+
+    if Constraint == constraints.GroupL1Ball:
+        groups = group_patches(x_patch_size=2, y_patch_size=2, x_image_size=6, y_image_size=6)
+        constraint = Constraint(alpha, groups)
+    elif Constraint == constraints.Cone:
+        raise NotImplementedError
+    else:
+        constraint = Constraint(alpha)
+    for _ in range(10):
+        data = (alpha + 1) * torch.rand(2, 3, 6, 6)
+        assert constraint.is_feasible(constraint.prox(data)).all()
+
+        grad = (alpha + 1) * torch.rand(2, 3, 6, 6)
+        update_dir, _ = constraint.lmo(-grad, data)
+        s = update_dir + data
+        assert constraint.is_feasible(s).all()
