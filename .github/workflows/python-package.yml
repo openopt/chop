@@ -20,6 +20,16 @@ jobs:
     steps:
     - name: Checking out code
       uses: actions/checkout@v2
+    - name: Cache conda
+      uses: actions/cache@v2
+      env:
+        # Increase this value to reset cache if etc/example-environment.yml has not changed
+        CACHE_NUMBER: 0
+      with:
+        path: ~/conda_pkgs_dir
+        key:
+          ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
+          hashFiles('etc/example-environment.yml') }}
     - name: Installing miniconda
       uses: conda-incubator/setup-miniconda@v2
       with:        
@@ -32,7 +42,6 @@ jobs:
     - name: Dependencies needed for coverage and unit tests
       run: |
         conda install matplotlib
-        pip install tqdm
         pip install
         pip install tensorboardX cox requests
         pip install advertorch copt
