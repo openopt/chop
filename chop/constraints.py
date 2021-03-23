@@ -204,6 +204,11 @@ class LpBall:
         for idx, (name, param) in enumerate(model.named_parameters()):
             param.copy_(self.prox(param))
 
+    def is_feasible(self, x, tol=5e-7):
+        """Checks if x is a feasible point of the constraint."""
+        p_norms = (x ** self.p).reshape(x.size(0), -1).sum(-1)
+        return p_norms.pow(1. / self.p) <= self.alpha + tol
+
 
 class LinfBall(LpBall):
     p = np.inf
@@ -236,7 +241,10 @@ class LinfBall(LpBall):
         max_step = self.active_set[away_direction]
         away_direction = torch.tensor(away_direction)
         return fw_direction - away_direction, max_step
-        
+
+    def is_feasible(self, x, tol=5e-7):
+        return abs(x).reshape(x.size(0), -1).max(dim=-1)[0] <= self.alpha + tol
+
 
 class L1Ball(LpBall):
     p = 1
@@ -287,7 +295,7 @@ class L2Ball(LpBall):
         Returns s-x, s solving the linear problem
         max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
         """
-        update_direction = iterate.clone().detach()
+        update_direction = -iterate.clone().detach()
         grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
         update_direction += self.alpha * (grad.view(grad.size(0), -1).T
                                             / grad_norms).T.view_as(iterate)
@@ -322,14 +330,21 @@ class Simplex:
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
-        largest_coordinate = torch.where(grad == grad.max())
+        batch_size = grad.size(0)
+        shape = iterate.shape
+        max_vals, max_idx = grad.reshape(batch_size, -1).max(-1)
 
-        update_direction = -iterate.clone().detach()
-        update_direction[largest_coordinate] += self.alpha * torch.sign(
-            grad[largest_coordinate]
-        )
+        update_direction = -iterate.clone().detach().reshape(batch_size, -1)
+        update_direction[range(batch_size), max_idx] += self.alpha
+        update_direction = update_direction.reshape(*shape)
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
+
+    def is_feasible(self, x, tol=5e-7):
+        batch_size = x.size(0)
+        reshaped_x = x.reshape(batch_size, -1)
+        return torch.logical_and(reshaped_x.min(dim=-1)[0] + tol >= 0,
+                                 reshaped_x.sum(-1) <= self.alpha + tol)
 
 
 class NuclearNormBall:
