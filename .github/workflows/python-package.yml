@@ -34,23 +34,9 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Running conda commands
-      run: |
-        echo $CONDA_DEFAULT_ENV
-        conda env list
-        pwd
-        python --version
-        which python
     - name: Installing environment and dependencies
       run: |
         $CONDA/bin/conda env update --file environment.yml --name base
-    - name: Running conda commands
-      run: |
-        echo $CONDA_DEFAULT_ENV
-        conda env list
-        pwd
-        python --version
-        which python
     - name: Install package
       run: |
         sudo python setup.py develop
@@ -62,7 +48,6 @@ jobs:
         pip install advertorch copt
         pip install git+https://github.com/RobustBench/robustbench
         pip install coveralls coverage pytest-cov
-        pip install dill
     - name: Dependencies needed for sphinx
       run: |
         pip install sphinx sphinx-gallery

@@ -5,9 +5,9 @@ dependencies:
  - python=3
  - numpy
  - pandas
-#  - pytorch
-#  - cudatoolkit
-#  - torchvision
+ - pytorch
+ - cudatoolkit
+ - torchvision
  - pip
  - pip:
    - tables
