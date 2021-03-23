@@ -28,7 +28,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install package and dependencies
       run: |
-        python setup.py develop
+        sudo python setup.py develop
     - name: Dependencies needed for coverage and unit tests
       run: |
         conda install matplotlib
