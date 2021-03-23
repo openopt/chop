@@ -31,7 +31,7 @@ jobs:
       run: |
         conda install matplotlib
         pip install tqdm
-        pip install dill
+        pip install
         pip install tensorboardX cox requests
         pip install advertorch copt
         pip install git+https://github.com/RobustBench/robustbench
@@ -43,3 +43,7 @@ jobs:
     - name: Running unit tests
       run: |
         py.test -v --cov=chop
+    - name: Publishing code coverage
+      run: |
+        coveralls
+
