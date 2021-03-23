@@ -47,6 +47,7 @@ jobs:
         pip install advertorch copt
         pip install git+https://github.com/RobustBench/robustbench
         pip install coveralls coverage pytest-cov
+        pip install dill
     - name: Dependencies needed for sphinx
       run: |
         pip install sphinx sphinx-gallery
