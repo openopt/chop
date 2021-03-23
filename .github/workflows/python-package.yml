@@ -50,12 +50,12 @@ jobs:
         $CONDA/bin/pip install coveralls coverage pytest-cov
     - name: Dependencies needed for sphinx
       run: |
-        pip install sphinx sphinx-gallery
-        pip install memory_profiler
+        $CONDA/bin/pip install sphinx sphinx-gallery
+        $CONDA/bin/pip install memory_profiler
     - name: Running unit tests
       run: |
         $CONDA/bin/pytest -v --cov=chop
     - name: Publishing code coverage
       run: |
-        coveralls
+        $CONDA/bin/coveralls
 
