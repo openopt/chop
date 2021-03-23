@@ -23,8 +23,8 @@ jobs:
     - name: Installing miniconda
       uses: conda-incubator/setup-miniconda@v2
       with:        
-        activate-environment: conda_env_${{ matrix.python-version }}
-        environment-file: etc/example-environment.yml
+        activate-environment: chop # environment name is definded in environment.yml
+        environment-file: environment.yml
         python-version: ${{ matrix.python-version }}
     - name: Install package and dependencies
       run: |
