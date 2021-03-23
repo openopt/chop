@@ -42,12 +42,12 @@ jobs:
         sudo python setup.py develop
     - name: Dependencies needed for coverage and unit tests
       run: |
-        pip install matplotlib
-        pip install tqdm
-        pip install tensorboardX cox requests
-        pip install advertorch copt
-        pip install git+https://github.com/RobustBench/robustbench
-        pip install coveralls coverage pytest-cov
+        $CONDA/bin/pip install matplotlib
+        $CONDA/bin/pip install tqdm
+        $CONDA/bin/pip install tensorboardX cox requests
+        $CONDA/bin/pip install advertorch copt
+        $CONDA/bin/pip install git+https://github.com/RobustBench/robustbench
+        $CONDA/bin/pip install coveralls coverage pytest-cov
     - name: Dependencies needed for sphinx
       run: |
         pip install sphinx sphinx-gallery
