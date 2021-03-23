@@ -53,7 +53,7 @@ jobs:
         pip install memory_profiler
     - name: Running unit tests
       run: |
-        pytest -v --cov=chop
+        python -m pytest -v --cov=chop
     - name: Publishing code coverage
       run: |
         coveralls
