@@ -42,7 +42,6 @@ jobs:
     - name: Dependencies needed for coverage and unit tests
       run: |
         pip install matplotlib
-        pip install
         pip install tensorboardX cox requests
         pip install advertorch copt
         pip install git+https://github.com/RobustBench/robustbench
