@@ -30,11 +30,9 @@ jobs:
         key:
           ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
           hashFiles('environment.yml') }}
-    - name: Installing miniconda
-      uses: conda-incubator/setup-miniconda@v2
-      with:        
-        activate-environment: chop # environment name is definded in environment.yml
-        environment-file: environment.yml
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
         python-version: ${{ matrix.python-version }}
     - name: Running conda commands
       run: |
@@ -43,7 +41,17 @@ jobs:
         pwd
         python --version
         which python
-    - name: Install package and dependencies
+    - name: Installing environment and dependencies
+      run: |
+        $CONDA/bin/conda env update --file environment.yml --name base
+    - name: Running conda commands
+      run: |
+        echo $CONDA_DEFAULT_ENV
+        conda env list
+        pwd
+        python --version
+        which python
+    - name: Install package
       run: |
         sudo python setup.py develop
     - name: Dependencies needed for coverage and unit tests
