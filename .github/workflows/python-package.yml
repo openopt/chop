@@ -31,6 +31,7 @@ jobs:
       run: |
         conda install matplotlib
         pip install tqdm
+        pip install dill
         pip install tensorboardX cox requests
         pip install advertorch copt
         pip install git+https://github.com/RobustBench/robustbench
