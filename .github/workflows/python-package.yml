@@ -37,6 +37,9 @@ jobs:
     - name: Installing environment and dependencies
       run: |
         $CONDA/bin/conda env update --file environment.yml --name base
+    - name: Activating conda environment
+      run: |
+        conda activate base 
     - name: Install package
       run: |
         sudo python setup.py develop
