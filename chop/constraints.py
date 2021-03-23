@@ -204,10 +204,10 @@ class LpBall:
         for idx, (name, param) in enumerate(model.named_parameters()):
             param.copy_(self.prox(param))
 
-    def is_feasible(self, x, tol=5e-7):
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         """Checks if x is a feasible point of the constraint."""
         p_norms = (x ** self.p).reshape(x.size(0), -1).sum(-1)
-        return p_norms.pow(1. / self.p) <= self.alpha + tol
+        return p_norms.pow(1. / self.p) <= self.alpha * (1. + rtol) + atol
 
 
 class LinfBall(LpBall):
@@ -242,8 +242,8 @@ class LinfBall(LpBall):
         away_direction = torch.tensor(away_direction)
         return fw_direction - away_direction, max_step
 
-    def is_feasible(self, x, tol=5e-7):
-        return abs(x).reshape(x.size(0), -1).max(dim=-1)[0] <= self.alpha + tol
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        return abs(x).reshape(x.size(0), -1).max(dim=-1)[0] <= self.alpha * (1. + rtol) + atol
 
 
 class L1Ball(LpBall):
@@ -340,11 +340,11 @@ class Simplex:
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
-    def is_feasible(self, x, tol=5e-7):
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         batch_size = x.size(0)
         reshaped_x = x.reshape(batch_size, -1)
-        return torch.logical_and(reshaped_x.min(dim=-1)[0] + tol >= 0,
-                                 reshaped_x.sum(-1) <= self.alpha + tol)
+        return torch.logical_and(reshaped_x.min(dim=-1)[0] + atol >= 0,
+                                 reshaped_x.sum(-1) <= self.alpha * (1. + rtol) + atol) 
 
 
 class NuclearNormBall:
@@ -363,7 +363,7 @@ class NuclearNormBall:
         """
         Computes the LMO for the Nuclear Norm Ball on the last two dimensions.
         Returns :math: `s - $iterate$` where
-        
+
           ..math::
             s = \argmax_u u^\top grad.
         Args:
@@ -408,7 +408,7 @@ class GroupL1Ball:
             groups = [torch.tensor(group) for group in groups]
         while groups[0].dim() < 2:
             groups = [group.unsqueeze(-1) for group in groups]
-        
+
         self.groups = []
         for g in groups:
             self.groups.append((...,) + tuple(g.T))
@@ -442,7 +442,7 @@ class GroupL1Ball:
     @torch.no_grad()
     def prox(self, x, step_size=None):
         """Proximal operator for the GroupL1 constraint"""
-        
+
         group_norms = self.get_group_norms(x)
         l1ball = L1Ball(self.alpha)
         normalized_group_norms = l1ball.prox(group_norms)
@@ -457,9 +457,10 @@ class GroupL1Ball:
 
         return output
 
-    def is_feasible(self, x, tol=5e-7):
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         group_norms = self.get_group_norms(x)
-        return (torch.linalg.norm(group_norms, ord=1, dim=-1) <= self.alpha + tol).all()
+        return torch.linalg.norm(group_norms, ord=1, dim=-1) <= (self.alpha * (1. + rtol)
+                                                                 + atol)
 
 
 class Box:
@@ -489,6 +490,11 @@ class Box:
             x clamped between a and b.
         """
         return torch.clamp(x, self.a, self.b)
+
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        reshaped_x = x.reshape(x.size(0), -1)
+        return torch.logical_and(reshaped_x.min(-1)[0] >= self.a * (1. + rtol) - atol,
+                                 reshaped_x.max(-1)[0] <= self.b * (1. + rtol) + atol)
 
 
 class Cone:
@@ -558,5 +564,8 @@ class Cone:
         res[project_idx] = utils.bmul((self.alpha * norm_p_orth_u[project_idx] + uTx[project_idx]) / (1. + self.alpha ** 2), 
                                       (self.alpha * utils.bmul(p_orth_u[project_idx], 1 / norm_p_orth_u[project_idx])
                                        + self.directions[project_idx]))
-
         return res
+
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        cosines = utils.bdot(x, self.directions)
+        return abs(cosines) >= utils.bnorm(x) * self.cos_angle * (1. + rtol) + atol

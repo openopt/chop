@@ -101,6 +101,7 @@ def test_cone_constraint():
                                         constraints.Simplex,
                                         constraints.NuclearNormBall,
                                         constraints.GroupL1Ball,
+                                        constraints.Box,
                                         constraints.Cone])
 @pytest.mark.parametrize('alpha', [.1, 1., 20.])
 def test_feasible(Constraint, alpha):
@@ -111,14 +112,23 @@ def test_feasible(Constraint, alpha):
         groups = group_patches(x_patch_size=2, y_patch_size=2, x_image_size=6, y_image_size=6)
         constraint = Constraint(alpha, groups)
     elif Constraint == constraints.Cone:
-        raise NotImplementedError
+        directions = torch.rand(2, 3, 6, 6)
+        cos_alpha = .2
+        constraint = Constraint(directions, cos_alpha)
+    elif Constraint == constraints.Box:
+        constraint = Constraint(-1., 10.)
     else:
         constraint = Constraint(alpha)
     for _ in range(10):
-        data = (alpha + 1) * torch.rand(2, 3, 6, 6)
-        assert constraint.is_feasible(constraint.prox(data)).all()
-
-        grad = (alpha + 1) * torch.rand(2, 3, 6, 6)
-        update_dir, _ = constraint.lmo(-grad, data)
-        s = update_dir + data
-        assert constraint.is_feasible(s).all()
+        try:
+            data = (alpha + 1) * torch.rand(2, 3, 6, 6)
+            assert constraint.is_feasible(constraint.prox(data)).all()
+        except AttributeError:  # Constraint doesn't have a prox operator
+            pass
+        try:
+            grad = (alpha + 1) * torch.rand(2, 3, 6, 6)
+            update_dir, _ = constraint.lmo(-grad, data)
+            s = update_dir + data
+            assert constraint.is_feasible(s).all()
+        except AttributeError:  # Constraint doesn't have an LMO
+            pass
