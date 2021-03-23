@@ -37,9 +37,6 @@ jobs:
     - name: Installing environment and dependencies
       run: |
         $CONDA/bin/conda env update --file environment.yml --name base
-    - name: Activating conda env
-      run: |
-        $CONDA/bin/conda activate base
     - name: Install package
       run: |
         sudo python setup.py develop
@@ -57,7 +54,7 @@ jobs:
         pip install memory_profiler
     - name: Running unit tests
       run: |
-        python -m pytest -v --cov=chop
+        $CONDA/bin/pytest -v --cov=chop
     - name: Publishing code coverage
       run: |
         coveralls
