@@ -55,8 +55,8 @@ jobs:
     - name: Running unit tests
       run: |
         $CONDA/bin/pytest -v --cov=chop
-    - name: Publishing coveralls
-      uses: coverallsapp/github-action@master
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+    # - name: Publishing coveralls
+    #   uses: coverallsapp/github-action@master
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
 
