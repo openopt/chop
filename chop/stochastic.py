@@ -121,7 +121,7 @@ class PGD(Optimizer):
 
       normalization: str
         Type of gradient normalization to be used.
-        Possible normalizations: {'none', 'L2', 'Linf', 'sign'}.
+        Possible values are 'none', 'L2', 'Linf', 'sign'.
 
     """
     name = 'PGD'
