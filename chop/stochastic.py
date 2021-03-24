@@ -386,7 +386,9 @@ class FrankWolfe(Optimizer):
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, lmo, lr=.1, momentum=.9, normalization='none'):
+    def __init__(self, params, lmo, lr=.1, momentum=.9, 
+                 weight_decay=0.,
+                 normalization='none'):
 
         self.lmo = []
         for oracle in lmo:
@@ -403,11 +405,16 @@ class FrankWolfe(Optimizer):
             if not(0. <= momentum <= 1.):
                 raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
+        if not (weight_decay >= 0):
+            raise ValueError("weight_decay should be nonnegative.")
+        self.weight_decay = weight_decay
         if normalization not in self.POSSIBLE_NORMALIZATIONS:
             raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}.")
         self.normalization = normalization
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, 
-                        momentum=self.momentum, normalization=self.normalization)
+                        momentum=self.momentum,
+                        weight_decay=weight_decay,
+                        normalization=self.normalization)
         super(FrankWolfe, self).__init__(params, defaults)
 
     @property
@@ -436,7 +443,7 @@ class FrankWolfe(Optimizer):
             for p in group['params']:
                 if p.grad is None:
                     continue
-                grad = p.grad
+                grad = p.grad + self.weight_decay * p
                 if grad.is_sparse:
                     raise RuntimeError(
                         'SFW does not yet support sparse gradients.')
@@ -463,7 +470,7 @@ class FrankWolfe(Optimizer):
 
                 state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - momentum)
                 update_direction, _ = self.lmo[idx](-state['grad_estimate'], p)
-                state['certificate'] = torch.dot(-state['grad_estimate'], update_direction)
+                state['certificate'] = (-state['grad_estimate'] * update_direction).sum()
                 if self.normalization == 'gradient':
                     grad_norm = torch.norm(state['grad_estimate'])
                     step_size = min(1., step_size * grad_norm / torch.linalg.norm(update_direction))
