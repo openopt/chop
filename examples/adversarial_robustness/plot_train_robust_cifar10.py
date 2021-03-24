@@ -14,21 +14,17 @@ from torch.optim import SGD
 
 from torchvision import models
 
-device = torch.device('cuda' if torch.cuda.is_available()
-                      else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 n_epochs = 100
 batch_size = 128
 batch_size_test = 100
 
-loaders = chop.data.load_cifar10(train_batch_size=batch_size,
-                                 test_batch_size=batch_size_test,
-                                 data_dir='~/datasets',
-                                 augment_train=True)
+dataset = chop.utils.data.CIFAR10('~/datasets')
+loaders = dataset.loaders(batch_size, batch_size_test)
 
-trainloader, testloader = loaders.train, loaders.test
-n_train = len(trainloader.dataset)
-n_test = len(testloader.dataset)
+n_train = len(loaders.train.dataset)
+n_test = len(loaders.test.dataset)
 
 model = models.resnet18(pretrained=False)
 model.to(device)
@@ -36,7 +32,7 @@ model.to(device)
 criterion = torch.nn.CrossEntropyLoss()
 
 optimizer = SGD(model.parameters(), lr=.1, momentum=.9, weight_decay=5e-4)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs)
 
 # Define the perturbation constraint set
 max_iter_train = 7
@@ -63,7 +59,7 @@ for _ in range(n_epochs):
 
     model.train()
 
-    for k, (data, target) in enumerate(trainloader):
+    for k, (data, target) in tqdm(enumerate(loaders.train)):
         data = data.to(device)
         target = target.to(device)
 
@@ -90,7 +86,7 @@ for _ in range(n_epochs):
                                      max_iter=max_iter_train)
 
         optimizer.zero_grad()
-        
+
         output = model(data)
         output_adv = model(data + delta)
         loss = criterion(output, target)
@@ -115,7 +111,7 @@ for _ in range(n_epochs):
 
     model.eval()
 
-    for k, (data, target) in enumerate(testloader):
+    for k, (data, target) in tqdm(enumerate(loaders.test)):
         data = data.to(device)
         target = target.to(device)
 
@@ -135,11 +131,11 @@ for _ in range(n_epochs):
             return delta
 
         _, delta = adversary.perturb(data, target, model,
-                                        criterion_adv,
-                                        prox=prox,
-                                        lmo=constraint.lmo,
-                                        step=2. / max_iter_test,
-                                        max_iter=max_iter_test)
+                                     criterion_adv,
+                                     prox=prox,
+                                     lmo=constraint.lmo,
+                                     step=2. / max_iter_test,
+                                     max_iter=max_iter_test)
 
         with torch.no_grad():
             output = model(data)

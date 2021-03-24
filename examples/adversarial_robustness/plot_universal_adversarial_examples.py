@@ -2,24 +2,25 @@
 Universal Adversarial Examples
 ================================
 
-This example shows how to generate and plot universeral adversarial examples for CIFAR-10,
-and compares the examples from different constraint sets, penalizations and solvers.
+This example shows how to generate and plot universal adversarial examples for
+CIFAR-10.
 
 We solve the following problem:
+
 ..math:
-    \max_{\delta \in \mathcal B} \frac{1}{n} \sum_{i=1}^n \ell(h_\theta(x_i+\delta), y_i) 
+    \max_{\delta \in \mathcal B} \frac{1}{n} \sum_{i=1}^n \ell(h_\theta(x_i + rho(\delta - x_i)), y_i) 
 """
+
+import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import torch
 from robustbench.utils import load_model
-import matplotlib.pyplot as plt
-import numpy as np
 
 import chop
-from chop.utils.image import group_patches, matplotlib_imshow_batch, matplotlib_imshow
-from chop.utils.data import ImageNet, CIFAR10, NormalizingModel
-from chop.utils.logging import Trace
-from tqdm import tqdm 
+from chop.utils.image import matplotlib_imshow
+from chop.utils.data import CIFAR10, NormalizingModel
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -28,15 +29,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 data_dir = "~/datasets/"
 dataset = CIFAR10(data_dir, normalize=False)
 
-
-normalize = dataset.normalize
-unnormalize = dataset.unnormalize
-
 classes = dataset.classes
-
 
 # CIFAR10 model
 model = load_model('Standard')  # Can be changed to any model from the robustbench model zoo
+
+# Add an initial layer to normalize data.
+# This allows us to use the [0, 1] image constraint set
 model = NormalizingModel(model, dataset)
 
 model = model.to(device)
@@ -67,6 +66,7 @@ test_acc_adv = []
 def apply_perturbation(data, delta):
     return data + rho * (delta - data)
 
+
 best_loss = -np.inf
 
 for _ in range(restarts):
@@ -74,9 +74,9 @@ for _ in range(restarts):
     delta = torch.rand(3, 32, 32).to(device)
     delta.requires_grad_(True)
     delta_opt = chop.stochastic.PGD([delta],
-                                    constraint=chop.constraints.Box(0, 1),
+                                    prox=chop.constraints.Box(0, 1).prox,
                                     lr=.2, normalization='Linf')
-    
+
     for it in range(n_epochs):
         for data, target in tqdm(loaders.train):
             data = data.to(device)
@@ -116,19 +116,19 @@ correct_adv /= n_datapoints
 
 print(f"Clean accuracy: {100 * correct:.2f}")
 print(f"Best attack accuracy {100 * correct_adv:.2f}")
-        
+
 plt.plot(losses, label='Training loss')
 plt.legend()
-plt.savefig("examples/plots/adversarial_examples/universal_losses.png")
+plt.show()
 
 
 fig, ax = plt.subplots()
-matplotlib_imshow(delta)
-plt.savefig("examples/plots/adversarial_examples/universal_perturbation.png")
+matplotlib_imshow(best_delta)
+plt.show()
 
 
 fig, ax = plt.subplots()
 data = data.to(device)
-pert_image = apply_perturbation(data[0], delta)
+pert_image = apply_perturbation(data[0], best_delta)
 matplotlib_imshow(pert_image)
-plt.savefig("examples/plots/adversarial_examples/universal_perturbation_on_image.png")
+plt.show()

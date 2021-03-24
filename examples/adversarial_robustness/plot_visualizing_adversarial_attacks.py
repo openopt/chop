@@ -65,7 +65,8 @@ print("L2 norm constraint.")
 alpha = 3
 constraint = chop.constraints.L2Ball(alpha)
 
-max_str_length = 15 # for plot: max length of class
+max_str_length = 15  # for plot: max length of class name
+
 
 def image_constraint_prox(delta, step_size=None):
     adv_img = torch.clamp(data + delta, 0, 1)
@@ -73,7 +74,7 @@ def image_constraint_prox(delta, step_size=None):
     return delta
 
 
-# TODO: think above using Dykstra instead of 2 alternate projections
+# TODO: think about using Dykstra instead of 2 alternate projections
 def prox(delta, step_size=None):
     """This needs to clip the data renormalized to [0, 1].
     The epsilon scale is w/ regard to this unit box constraint."""
@@ -113,14 +114,17 @@ matplotlib_imshow_batch(data + delta, labels=[classes[int(k)][:max_str_length] f
 
 # Perturbation
 matplotlib_imshow_batch(abs(delta), axes=ax[:, 5], normalize=True,
-                        # title=f'L{constraint.p}', negative=True)
                         title=f'L{constraint.p}', negative=False)
+
+print(f"F1 score: {f1_score(target.detach().cpu(), adv_labels.detach().cpu(), average='macro'):.3f}"
+      f" for alpha={alpha:.4f}")
 
 
 print("GroupL1 constraint.")
 
 # CIFAR-10
 # groups = group_patches(x_patch_size=8, y_patch_size=8, x_image_size=32, y_image_size=32)
+
 # Imagenet
 groups = group_patches(x_patch_size=28, y_patch_size=28, x_image_size=224, y_image_size=224)
 
@@ -157,15 +161,13 @@ for eps in [5e-2]:
 
 print("Nuclear norm ball adv examples")
 
-for alpha in [.5]:
+for alpha in [5.]:
     constraint_nuc = chop.constraints.NuclearNormBall(alpha)
-
 
     def prox_nuc(delta, step_size=None):
         delta = constraint_nuc.prox(delta, step_size)
         delta = image_constraint_prox(delta, step_size)
         return delta
-
 
     adversary = chop.Adversary(chop.optim.minimize_frank_wolfe)
     callback_nuc = Trace()
@@ -199,6 +201,7 @@ plt.subplots_adjust(bottom=.06, top=0.5)
 
 plt.tight_layout()
 plt.show()
+plt.savefig('adv_attacks.png')
 
 
 # TODO refactor this in functions
