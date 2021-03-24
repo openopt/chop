@@ -112,6 +112,5 @@ for r, p in r_p:
 
     plt.tight_layout()
     plt.show()
-    plt.savefig(f'RobustPCA, r={r} and p={p}.png')
     print(f"L1 norm: {abs(result.x).sum()}")
     print(f"Nuc Norm: {torch.linalg.norm(result.y.squeeze(), ord='nuc')}")
