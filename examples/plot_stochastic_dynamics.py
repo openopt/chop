@@ -48,17 +48,17 @@ def optimize(x_0, loss_func, constraint, optimizer_class, iterations=10):
 
     constraint_oracles = {
         PGD: {
-            'prox': prox
+            'prox': [prox]
         },
         PGDMadry: {
-            'prox': prox,
-            'lmo': lmo
+            'prox': [prox],
+            'lmo': [lmo]
         },
         FrankWolfe: {
-            'lmo': lmo
+            'lmo': [lmo]
         },
         S3CM: {
-            'prox2': prox
+            'prox2': [prox]
         }
     }
 

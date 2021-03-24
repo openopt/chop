@@ -106,17 +106,36 @@ def normalize_gradient(grad, normalization):
     return grad
         
 
-
 class PGD(Optimizer):
-    """Projected Gradient Descent"""
+    """Proximal Gradient Descent
+
+    Args:
+      params: [torch.Parameter]
+        List of parameters to optimize over
+      prox: [callable or None]
+        List of prox operators, one per parameter.
+      lr: float
+        Learning rate
+      momentum: float in [0, 1]
+
+      normalization: str
+        Type of gradient normalization to be used.
+        Possible values are 'none', 'L2', 'Linf', 'sign'.
+
+    """
     name = 'PGD'
     POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
 
     def __init__(self, params, prox=None, lr=.1, momentum=.9, normalization='none'):
-        if prox is not None:
-            self.prox = lambda x, s=None: prox(x.unsqueeze(0)).squeeze()
-        else:
-            self.prox = lambda x, s=None: x
+        if prox is None:
+            prox = [None] * len(params)
+
+        self.prox = []
+        for prox_el in prox:
+            if prox_el is not None:
+                self.prox.append(lambda x, s=None: prox_el(x.unsqueeze(0)).squeeze())
+            else:
+                self.prox.append(lambda x, s=None: x)
 
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
@@ -150,6 +169,7 @@ class PGD(Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
+        idx = 0
         for groups in self.param_groups:
             for p in groups['params']:
                 if p.grad is None:
@@ -178,23 +198,53 @@ class PGD(Optimizer):
                 else:
                     step_size = self.lr
 
-                new_p = self.prox(p - step_size * grad_est, 1.)
+                new_p = self.prox[idx](p - step_size * grad_est, 1.)
                 state['certificate'] = torch.norm((p - new_p) / step_size)
                 p.copy_(new_p)
+                idx += 1
         return loss
 
 
 class PGDMadry(Optimizer):
-    """What Madry et al. call PGD"""
+    """PGD from [1]. 
+
+    Args:
+      params: [torch.Tensor]
+        list of parameters to optimize
+
+      lmo: [callable]
+        list of lmo operators for each parameter
+
+      prox: [callable or None] or None
+        list of prox operators for each parameter
+
+      lr: float > 0
+        learning rate
+
+    References:
+      Madry, Aleksander, and Makelov, Aleksandar, and Schmidt, Ludwig,
+      and Tsipras, Dimitris, and Vladu, Adrian. Towards Deep Learning Models
+      Resistant to Adversarial Attacks. ICLR 2018.
+    """
     name = 'PGD-Madry'
 
     def __init__(self, params, lmo, prox=None, lr=1e-2):
-        self.prox = lambda x, s=None: prox(x.unsqueeze(0), s).squeeze()
+        self.prox = []
+        for prox_el in prox:
+            if prox_el is None:
+                def prox_el(x, s=None):
+                    return x
 
-        def _lmo(u, x):
-            update_direction, max_step_size = lmo(u.unsqueeze(0), x.unsqueeze(0))
-            return update_direction.squeeze(dim=0), max_step_size
-        self.lmo = _lmo
+            def _prox(x, s=None):
+                return prox_el(x.unsqueeze(0), s).squeeze()
+            self.prox.append(_prox)
+
+        self.lmo = []
+        for lmo_el in lmo:
+            def _lmo(u, x):
+                update_direction, max_step_size = lmo_el(u.unsqueeze(0), x.unsqueeze(0))
+                return update_direction.squeeze(dim=0), max_step_size
+            self.lmo.append(_lmo)
 
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
@@ -219,6 +269,7 @@ class PGDMadry(Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
+        idx = 0
         for groups in self.param_groups:
             for p in groups['params']:
                 if p.grad is None:
@@ -237,19 +288,39 @@ class PGDMadry(Optimizer):
                     step_size = 1. / (state['step'] + 1.)
                 else:
                     step_size = self.lr
-                lmo_res, _ = self.lmo(-p.grad, p)
+                lmo_res, _ = self.lmo[idx](-p.grad, p)
                 normalized_grad = lmo_res + p
-                new_p = self.prox(p + step_size * normalized_grad)
+                new_p = self.prox[idx](p + step_size * normalized_grad)
                 state['certificate'] = torch.norm((p - new_p) / step_size)
                 p.copy_(new_p)
+                idx += 1
         return loss
 
 
 class S3CM(Optimizer):
-    """Stochastic Three Composite Minimization (S3CM)
-    Cf
-    https://arxiv.org/abs/1701.09033
-    Yurtsever, Vu, Cevher, 2017
+    """
+    Stochastic Three Composite Minimization (S3CM)
+
+    Args:
+      params: [torch.Tensor]
+        list of parameters to optimize
+
+      prox1: [callable or None] or None
+        Proximal operator for first constraint set.
+
+      prox2: [callable or None] or None
+        Proximal operator for second constraint set.
+    
+      lr: float > 0
+        Learning rate
+    
+      normalization: str in {'none', 'L2', 'Linf', 'sign'}
+        Normalizes the gradient. 'L2', 'Linf' divide the gradient by the corresponding norm.
+        'sign' uses the sign of the gradient.
+
+    References:
+      Yurtsever, Alp, and Vu, Bang Cong, and Cevher, Volkan.
+      "Stochastic Three-Composite Convex Minimization" NeurIPS 2016
     """
     name = "S3CM"
     POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
@@ -265,13 +336,22 @@ class S3CM(Optimizer):
             raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
 
         if prox1 is None:
-            def prox1(x, s=None): return x
-
+            prox1 = [None] * len(params)
         if prox2 is None:
-            def prox2(x, s=None): return x
+            prox2 = [None] * len(params)
 
-        self.prox1 = lambda x, s=None: prox1(x.unsqueeze(0), s).squeeze(dim=0)
-        self.prox2 = lambda x, s=None: prox2(x.unsqueeze(0), s).squeeze(dim=0)
+        self.prox1 = []
+        self.prox2 = []
+
+        for prox1_, prox2_ in zip(prox1, prox2):
+            if prox1_ is None:
+                def prox1_(x, s=None): return x
+
+            if prox2_ is None:
+                def prox2_(x, s=None): return x
+
+            self.prox1.append(lambda x, s=None: prox1_(x.unsqueeze(0), s).squeeze(dim=0))
+            self.prox2.append(lambda x, s=None: prox2_(x.unsqueeze(0), s).squeeze(dim=0))
 
         defaults = dict(lr=self.lr, prox1=self.prox1, prox2=self.prox2,
                         normalization=self.normalization)
@@ -284,6 +364,7 @@ class S3CM(Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
+        idx = 0
         for group in self.param_groups:
             for p in group['params']:
                 if p.grad is None:
@@ -300,17 +381,17 @@ class S3CM(Optimizer):
                 if len(state) == 0:
                     state['step'] = 0
                     state['iterate_1'] = p.clone().detach()
-                    state['iterate_2'] = self.prox2(p, self.lr)
+                    state['iterate_2'] = self.prox2[idx](p, self.lr)
                     state['dual'] = (state['iterate_1'] - state['iterate_2']) / self.lr
 
-                state['iterate_2'] = self.prox2(state['iterate_1'] + self.lr * state['dual'], self.lr)
+                state['iterate_2'] = self.prox2[idx](state['iterate_1'] + self.lr * state['dual'], self.lr)
                 state['dual'].add_((state['iterate_1'] - state['iterate_2']) / self.lr)
-                state['iterate_1'] = self.prox1(state['iterate_2'] 
-                                                - self.lr * (grad + state['dual']), self.lr)
+                state['iterate_1'] = self.prox1[idx](state['iterate_2'] 
+                                                     - self.lr * (grad + state['dual']), self.lr)
 
                 p.copy_(state['iterate_2'])
-           
-        
+                idx += 1
+
 
 class PairwiseFrankWolfe(Optimizer):
     """Pairwise Frank-Wolfe algorithm"""
@@ -334,17 +415,45 @@ class PairwiseFrankWolfe(Optimizer):
 
 class FrankWolfe(Optimizer):
     """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al.
-    This is essentially FrankWolfe with Momentum.
-    We use the tricks from [Pokutta, Spiegel, Zimmer, 2020].
-    https://arxiv.org/abs/2010.07243"""
+    This is essentially Frank-Wolfe with Momentum.
+    We use the tricks from [1] for gradient normalization.
+
+    Args:
+      params: [torch.Tensor]
+        Parameters to optimize over.
+
+      lmo: [callable]
+        List of LMO operators.
+
+      lr: float
+        Learning rate
+
+      momentum: float in [0, 1]
+        Amount of momentum to be used in gradient estimator
+
+      weight_decay: float > 0
+        Amount of L2 regularization to be added
+
+      normalization: str in {'gradient', 'none'}
+        Gradient normalization to be used. 'gradient' option is described in [1].
+
+    References:
+      Pokutta, Sebastian, and Spiegel, Christoph and Zimmer, Max,
+      Deep Neural Network Training with Frank Wolfe. 2020.
+    """
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, lmo, lr=.1, momentum=.9, normalization='none'):
-        def _lmo(u, x):
-            update_direction, max_step_size = lmo(u.unsqueeze(0), x.unsqueeze(0))
-            return update_direction.squeeze(dim=0), max_step_size
-        self.lmo = _lmo
+    def __init__(self, params, lmo, lr=.1, momentum=.9, 
+                 weight_decay=0.,
+                 normalization='none'):
+
+        self.lmo = []
+        for oracle in lmo:
+            def _lmo(u, x):
+                update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
+                return update_direction.squeeze(dim=0), max_step_size
+            self.lmo.append(_lmo)
 
         if type(lr) == float:
             if not (0. < lr <= 1.):
@@ -354,11 +463,16 @@ class FrankWolfe(Optimizer):
             if not(0. <= momentum <= 1.):
                 raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
+        if not (weight_decay >= 0):
+            raise ValueError("weight_decay should be nonnegative.")
+        self.weight_decay = weight_decay
         if normalization not in self.POSSIBLE_NORMALIZATIONS:
             raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}.")
         self.normalization = normalization
         defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, 
-                        momentum=self.momentum, normalization=self.normalization)
+                        momentum=self.momentum,
+                        weight_decay=weight_decay,
+                        normalization=self.normalization)
         super(FrankWolfe, self).__init__(params, defaults)
 
     @property
@@ -377,16 +491,17 @@ class FrankWolfe(Optimizer):
         Arguments:
             closure (callable, optional): A closure that reevaluates the model
                 and returns the loss
-            """
+        """
         loss = None
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
+        idx = 0
         for group in self.param_groups:
             for p in group['params']:
                 if p.grad is None:
                     continue
-                grad = p.grad
+                grad = p.grad + self.weight_decay * p
                 if grad.is_sparse:
                     raise RuntimeError(
                         'SFW does not yet support sparse gradients.')
@@ -412,12 +527,13 @@ class FrankWolfe(Optimizer):
                 state['step'] += 1.
 
                 state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - momentum)
-                update_direction, _ = self.lmo(-state['grad_estimate'], p)
-                state['certificate'] = torch.dot(-state['grad_estimate'], update_direction)
+                update_direction, _ = self.lmo[idx](-state['grad_estimate'], p)
+                state['certificate'] = (-state['grad_estimate'] * update_direction).sum()
                 if self.normalization == 'gradient':
                     grad_norm = torch.norm(state['grad_estimate'])
                     step_size = min(1., step_size * grad_norm / torch.linalg.norm(update_direction))
                 elif self.normalization == 'none':
                     pass
-                p += step_size * update_direction
+                p.add_(step_size * update_direction)
+                idx += 1
         return loss
