@@ -74,7 +74,7 @@ for _ in range(restarts):
     delta = torch.rand(3, 32, 32).to(device)
     delta.requires_grad_(True)
     delta_opt = chop.stochastic.PGD([delta],
-                                    prox=chop.constraints.Box(0, 1).prox,
+                                    prox=[chop.constraints.Box(0, 1).prox],
                                     lr=.2, normalization='Linf')
 
     for it in range(n_epochs):
