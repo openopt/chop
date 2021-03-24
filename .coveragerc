@@ -1,9 +1,20 @@
 [run]
 branch = True
 source = chop
-include = */chop/*
 
 [report]
 exclude_lines =
-    if verbose
-omit = **/data_utils.py
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    if verbose:
+
+omit = 
+    **/utils/data.py
+    **/utils/logging.py
+    **/utils/image.py
