@@ -69,6 +69,7 @@ def make_feasible(model, proxes):
     """
     Projects all parameters of model onto the associated constraint set,
     using its prox operator (really a projection here).
+    This function operates in-place.
 
     Args:
       model: torch.nn.Module
@@ -231,12 +232,43 @@ class LinfBall(LpBall):
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """Projection onto the L-infinity ball.
+
+        Args:
+          x: torch.Tensor of shape (batchs_size, *)
+            tensor to project
+          step_size: Any
+            Not used here
+        
+        Returns:
+          p: torch.Tensor, same shape as x
+            projection of x onto the L-infinity ball.
+        """
         if torch.max(abs(x)) <= self.alpha:
             return x
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
+        """Linear Maximization Oracle.
+        Return s - iterate with s solving the linear problem
+
+        ..math::
+            max_{||s||_\infty <= alpha} <grad, s>
+
+        Args:
+          grad: torch.Tensor of shape (batch_size, *)
+              usually -gradient
+          iterate: torch.Tensor of shape (batch_size, *)
+              usually the iterate of the considered algorithm
+
+        Returns:
+          update_direction: torch.Tensor, same shape as grad and iterate,
+              s - iterate, where s is the vertex of the constraint most correlated
+              with u
+          max_step_size: torch.Tensor of shape (batch_size,)
+              1. for a Frank-Wolfe step.
+        """
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
@@ -267,8 +299,24 @@ class L1Ball(LpBall):
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
-        """Returns s-x, s solving the linear problem
-        max_{\|s\|_1 <= \\alpha} \\langle grad, s\\rangle
+        """Linear Maximization Oracle.
+        Return s - iterate with s solving the linear problem
+
+        ..math::
+            max_{||s||_1 <= alpha} <grad, s>
+
+        Args:
+          grad: torch.Tensor of shape (batch_size, *)
+              usually -gradient
+          iterate: torch.Tensor of shape (batch_size, *)
+              usually the iterate of the considered algorithm
+
+        Returns:
+          update_direction: torch.Tensor, same shape as grad and iterate,
+              s - iterate, where s is the vertex of the constraint most correlated
+              with u
+          max_step_size: torch.Tensor of shape (batch_size,)
+              1. for a Frank-Wolfe step.
         """
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
@@ -284,6 +332,18 @@ class L1Ball(LpBall):
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """Projection onto the L1 ball.
+
+        Args:
+          x: torch.Tensor of shape (batchs_size, *)
+            tensor to project
+          step_size: Any
+            Not used here
+        
+        Returns:
+          p: torch.Tensor, same shape as x
+            projection of x onto the L1 ball.
+        """
         shape = x.shape
         flattened_x = x.view(shape[0], -1)
         # TODO vectorize this
@@ -297,6 +357,18 @@ class L2Ball(LpBall):
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """Projection onto the L2 ball.
+
+        Args:
+          x: torch.Tensor of shape (batchs_size, *)
+            tensor to project
+          step_size: Any
+            Not used here
+        
+        Returns:
+          p: torch.Tensor, same shape as x
+            projection of x onto the L2 ball.
+        """
         norms = utils.bnorm(x)
         mask = norms > self.alpha
         projected = x.clone().detach()
@@ -306,9 +378,24 @@ class L2Ball(LpBall):
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
-        """
-        Returns s-x, s solving the linear problem
-        max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
+        """Linear Maximization Oracle.
+        Return s - iterate with s solving the linear problem
+
+        ..math::
+            max_{||s||_2 <= alpha} <grad, s>
+
+        Args:
+          grad: torch.Tensor of shape (batch_size, *)
+              usually -gradient
+          iterate: torch.Tensor of shape (batch_size, *)
+              usually the iterate of the considered algorithm
+
+        Returns:
+          update_direction: torch.Tensor, same shape as grad and iterate,
+              s - iterate, where s is the vertex of the constraint most correlated
+              with u
+          max_step_size: torch.Tensor of shape (batch_size,)
+              1. for a Frank-Wolfe step.
         """
         update_direction = -iterate.clone().detach()
         grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
