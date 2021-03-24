@@ -7,6 +7,8 @@ can be found [here](https://github.com/pytorch/examples/blob/master/mnist/main.p
 """
 from tqdm import tqdm
 
+import numpy as np
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -52,6 +54,7 @@ class Net(nn.Module):
         output = F.log_softmax(x, dim=1)
         return output
 
+
 print("Initializing model.")
 model = Net()
 model.to(device)
@@ -63,12 +66,9 @@ nb_epochs = 20
 momentum = .9
 lr = 0.3
 
-# Choose optimizer here
-# optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
 # Make constraints
 print("Preparing constraints.")
-constraints = chop.constraints.make_Lp_model_constraints(model, p=1, value=10000)
+constraints = chop.constraints.make_Lp_model_constraints(model, p=np.inf, value=10000)
 proxes = [constraint.prox for constraint in constraints]
 lmos = [constraint.lmo for constraint in constraints]
 
