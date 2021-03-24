@@ -107,9 +107,8 @@ def normalize_gradient(grad, normalization):
         
 
 class PGD(Optimizer):
-    """
-    Proximal Gradient Descent
-    =========================
+    """Proximal Gradient Descent
+
     Args:
       params: [torch.Parameter]
         List of parameters to optimize over
@@ -207,7 +206,26 @@ class PGD(Optimizer):
 
 
 class PGDMadry(Optimizer):
-    """What Madry et al. call PGD"""
+    """PGD from [1]. 
+
+    Args:
+      params: [torch.Tensor]
+        list of parameters to optimize
+
+      lmo: [callable]
+        list of lmo operators for each parameter
+
+      prox: [callable or None] or None
+        list of prox operators for each parameter
+
+      lr: float > 0
+        learning rate
+
+    References:
+      Madry, Aleksander, and Makelov, Aleksandar, and Schmidt, Ludwig,
+      and Tsipras, Dimitris, and Vladu, Adrian. Towards Deep Learning Models
+      Resistant to Adversarial Attacks. ICLR 2018.
+    """
     name = 'PGD-Madry'
 
     def __init__(self, params, lmo, prox=None, lr=1e-2):
@@ -282,10 +300,27 @@ class PGDMadry(Optimizer):
 class S3CM(Optimizer):
     """
     Stochastic Three Composite Minimization (S3CM)
-    ==============================================
-    See
-    https://arxiv.org/abs/1701.09033
-    Yurtsever, Vu, Cevher, 2017
+
+    Args:
+      params: [torch.Tensor]
+        list of parameters to optimize
+
+      prox1: [callable or None] or None
+        Proximal operator for first constraint set.
+
+      prox2: [callable or None] or None
+        Proximal operator for second constraint set.
+    
+      lr: float > 0
+        Learning rate
+    
+      normalization: str in {'none', 'L2', 'Linf', 'sign'}
+        Normalizes the gradient. 'L2', 'Linf' divide the gradient by the corresponding norm.
+        'sign' uses the sign of the gradient.
+
+    References:
+      Yurtsever, Alp, and Vu, Bang Cong, and Cevher, Volkan.
+      "Stochastic Three-Composite Convex Minimization" NeurIPS 2016
     """
     name = "S3CM"
     POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
@@ -380,9 +415,32 @@ class PairwiseFrankWolfe(Optimizer):
 
 class FrankWolfe(Optimizer):
     """Class for the Stochastic Frank-Wolfe algorithm given in Mokhtari et al.
-    This is essentially FrankWolfe with Momentum.
-    We use the tricks from [Pokutta, Spiegel, Zimmer, 2020].
-    https://arxiv.org/abs/2010.07243"""
+    This is essentially Frank-Wolfe with Momentum.
+    We use the tricks from [1] for gradient normalization.
+
+    Args:
+      params: [torch.Tensor]
+        Parameters to optimize over.
+
+      lmo: [callable]
+        List of LMO operators.
+
+      lr: float
+        Learning rate
+
+      momentum: float in [0, 1]
+        Amount of momentum to be used in gradient estimator
+
+      weight_decay: float > 0
+        Amount of L2 regularization to be added
+
+      normalization: str in {'gradient', 'none'}
+        Gradient normalization to be used. 'gradient' option is described in [1].
+
+    References:
+      Pokutta, Sebastian, and Spiegel, Christoph and Zimmer, Max,
+      Deep Neural Network Training with Frank Wolfe. 2020.
+    """
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
