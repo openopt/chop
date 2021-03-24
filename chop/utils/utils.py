@@ -110,6 +110,7 @@ def bnorm(tensor, *args, **kwargs):
     batch_size = tensor.size(0)
     return torch.linalg.norm(tensor.reshape(batch_size, -1), dim=-1, *args, **kwargs)
 
+
 def bmm(tensor, other):
     *batch_dims, m, n = tensor.shape
     *_, n2,  p = other.shape
