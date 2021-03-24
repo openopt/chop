@@ -84,7 +84,7 @@ for r, p in r_p:
         A = q - z
 
         step_size = torch.clamp(utils.bdiv(utils.bdot(A, B), utils.bdot(A, A)), max=1.)
-        assert (step_size >= 0).all(), 'WTF'
+        assert (step_size >= 0).all()
         return step_size
 
     result = chop.optim.minimize_alternating_fw_prox(sqloss,
