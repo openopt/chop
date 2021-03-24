@@ -30,7 +30,7 @@ def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
 
 
 @torch.no_grad()
-def create_lp_constraints(model, p=2, value=300, mode='initialization'):
+def make_Lp_model_constraints(model, p=2, value=300, mode='initialization'):
     """Create LpBall constraints for each layer of model, and value depends on mode (either radius or
     factor to multiply average initialization norm with)"""
     constraints = []
@@ -63,6 +63,22 @@ def create_lp_constraints(model, p=2, value=300, mode='initialization'):
         constraints.append(constraint)
     return constraints
 
+
+@torch.no_grad()
+def make_feasible(model, proxes):
+    """
+    Projects all parameters of model onto the associated constraint set,
+    using its prox operator (really a projection here).
+
+    Args:
+      model: torch.nn.Module
+        Model to make feasible
+      prox: [callable]
+        List of projection operators
+    """
+    for param, prox in zip(model.parameters(), proxes):
+        if prox is not None:
+            param.copy_(prox(param.unsqueeze(0)).squeeze(0))
 
 @torch.no_grad()
 def euclidean_proj_simplex(v, s=1.):
@@ -281,12 +297,11 @@ class L2Ball(LpBall):
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
-        shape = x.shape
         norms = utils.bnorm(x)
         mask = norms > self.alpha
         projected = x.clone().detach()
-        projected[mask] = utils.bdiv(projected[mask], norms[mask])
-        return self.alpha * projected.view(shape)
+        projected[mask] = self.alpha * utils.bdiv(projected[mask], norms[mask])
+        return projected
 
 
     @torch.no_grad()
