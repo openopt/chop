@@ -49,6 +49,35 @@ class Dataset:
         return data.to(device), target.to(device)
 
 
+class MNIST(Dataset):
+
+    def __init__(self, data_dir, normalize=True):
+        """Initializes dataset"""
+        self.mean = torch.Tensor([0.1307])
+        self.std = torch.Tensor([0.3081])
+
+        self.normalize = t.Normalize(self.mean, self.std)
+        self.unnormalize = t.Normalize(-self.mean / self.std, 1. / self.std)
+
+        transforms_train = [t.ToTensor()]
+        transforms_test = [t.ToTensor()]
+
+        if normalize:
+            transforms_train.append(self.normalize)
+            transforms_test.append(self.normalize)
+
+        Dataset.__init__(self, data_dir, transforms_train, transforms_test)
+
+        self.dataset.train = torchvision.datasets.MNIST(root=data_dir, train=True,
+                                                        transform=self.transforms.train,
+                                                        download=True)
+        self.dataset.test = torchvision.datasets.MNIST(root=data_dir, train=False,
+                                                        transform=self.transforms.train,
+                                                        download=True)
+
+        self.classes = self.dataset.train.classes
+
+
 class CIFAR10(Dataset):
 
     def __init__(self, data_dir, normalize=True):
