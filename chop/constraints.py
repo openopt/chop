@@ -468,6 +468,7 @@ class NuclearNormBall:
 
           ..math::
             s = \argmax_u u^\top grad.
+
         Args:
           grad: torch.Tensor of shape (*, m, n)
           iterate: torch.Tensor of shape (*, m, n)
