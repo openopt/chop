@@ -30,8 +30,10 @@ y = abs(y / y.max())
 tol = 4e-3
 
 
-@pytest.mark.parametrize('algorithm', [stochastic.PGD, stochastic.PGDMadry,
-                                       stochastic.FrankWolfe])
+@pytest.mark.parametrize('algorithm', [stochastic.PGD,
+                                       stochastic.PGDMadry,
+                                       stochastic.FrankWolfe,
+                                       stochastic.S3CM])
 @pytest.mark.parametrize('lr', [1., .5, .1, .05, .001])
 def test_L1Ball(algorithm, lr):
     # Setup
@@ -43,14 +45,18 @@ def test_L1Ball(algorithm, lr):
 
     constraint_oracles = {
         stochastic.PGD.name: {
-            'prox': prox
+            'prox': [prox]
         },
         stochastic.PGDMadry.name: {
-            'prox': prox,
-            'lmo': lmo
+            'prox': [prox],
+            'lmo': [lmo]
         },
         stochastic.FrankWolfe.name: {
-            'lmo': lmo
+            'lmo': [lmo]
+        },
+        stochastic.S3CM.name: {
+            'prox1': [prox],
+            'prox2': [prox]
         }
     }
 
@@ -72,8 +78,11 @@ def test_L1Ball(algorithm, lr):
 
         optimizer.step()
 
-        cert = next(optimizer.certificate)  # only one parameter here
-
+        try:
+            cert = next(optimizer.certificate)  # only one parameter here
+        except AttributeError:
+            cert = torch.tensor(np.nan)
+            
         store.log_table_and_tb(optimizer.name, {'func_val': loss.item(),
                                                 'certificate': cert.item(),
                                                 'norm(w_t)': sum(abs(w_t)).item()
