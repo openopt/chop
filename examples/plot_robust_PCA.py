@@ -4,12 +4,12 @@ Robust PCA
 
 This example fits a Robust PCA model to data.
 It uses a hybrid Frank-Wolfe and proximal method.
-See description in optim.minimize_alternating_fw_prox.
+See description in :func:`chop.optim.minimize_alternating_fw_prox`.
 
 
-We reproduce the synthetic experimental setting from [Garber et al. 2018].
-We aim to recover :math: `M = L + S + N`, where :math: `L` is rank :math: `p`,
-:math: `S` is :math: `p` sparse, and :math: `N` is standard Gaussian elementwise.
+We reproduce the synthetic experimental setting from `[Garber et al. 2018] <https://arxiv.org/pdf/1802.05581.pdf>`_.
+We aim to recover :math:`M = L + S + N`, where :math:`L` is rank :math:`p`,
+:math:`S` is :math:`p` sparse, and :math:`N` is standard Gaussian elementwise.
 """
 
 
