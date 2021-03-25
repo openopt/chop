@@ -570,16 +570,24 @@ class Box:
     """
     Box constraint.
     Args:
-        a: float
+        a: float or None
         min of the box constraint
-        b: float
+        b: float or None
         max of the box constraint
     """
-    def __init__(self, a, b):
+    def __init__(self, a=None, b=None):
         """
           """
-        if b < a:
-            raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
+
+        if a is None and b is None:
+            raise ValueError("One of a, b should not be None.")
+        if a is None:
+            a = -np.inf
+        elif b is None:
+            b = np.inf
+        else:
+            if b < a:
+                raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
         self.a = a
         self.b = b
 
@@ -592,7 +600,7 @@ class Box:
           x_thresh: torch.Tensor
             x clamped between a and b.
         """
-        return torch.clamp(x, self.a, self.b)
+        return torch.clamp(x, min=self.a, max=self.b)
 
     def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         reshaped_x = x.reshape(x.size(0), -1)
