@@ -18,6 +18,11 @@ jobs:
         python-version: [3.8]
 
     steps:
+    - name: Uploading docs to gcs
+      uses: actions-hub/gcloud@master
+      with:
+        args: ls gs://openo.pt/chop
+        cli: gsutil
     - name: Checking out code
       uses: actions/checkout@v2
     - name: Cache conda
