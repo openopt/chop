@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [3.8]
 
     steps:
     - name: Checking out code
@@ -55,6 +55,12 @@ jobs:
     - name: Running unit tests
       run: |
         $CONDA/bin/pytest -v --cov=chop
+    - name: Building the documentation
+      working-directory: doc/
+      run: |
+        make html
+        
+
     # - name: Publishing coveralls
     #   uses: coverallsapp/github-action@master
     #   with:
