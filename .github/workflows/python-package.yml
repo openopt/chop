@@ -18,14 +18,6 @@ jobs:
         python-version: [3.8]
 
     steps:
-    - name: Uploading docs to gcs
-      uses: actions-hub/gcloud@master
-      env:
-        PROJECT_ID: test
-        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
-      with:
-        args: ls gs://openo.pt/chop
-        cli: gsutil
     - name: Checking out code
       uses: actions/checkout@v2
     - name: Cache conda
@@ -67,6 +59,14 @@ jobs:
       working-directory: doc/
       run: |
         make html
+        - name: Uploading docs to gcs
+    - uses: actions-hub/gcloud@master
+      env:
+        PROJECT_ID: test # This is a placeholder value that is only needed for the action to succeed, it's not an optional parameter
+        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+      with:
+        args: -m doc/rsync -r _build/html gs://openo.pt/chop
+        cli: gsutil
         
 
     # - name: Publishing coveralls
