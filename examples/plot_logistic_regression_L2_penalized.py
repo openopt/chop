@@ -3,6 +3,7 @@ L2 penalized logistic regression
 ==================================
 
 L2 penalized (unconstrained) logistic regression on the Covtype dataset.
+Uses full-batch gradient descent with line-search.
 """
 
 import torch
@@ -19,9 +20,12 @@ import matplotlib.pyplot as plt
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# Regularization strength
 lmbd = 1.
-max_iter = 100
 
+max_iter = 200
+
+# Load and prepare dataset
 X, y = fetch_covtype(return_X_y=True)
 y[y != 2] = -1
 y[y == 2] = 1
@@ -34,9 +38,10 @@ y = torch.tensor(y > 0, dtype=torch.float32, device=device)
 
 n_datapoints, n_features = X.shape
 
+# Initialize weights
 x0 = torch.zeros(1, n_features, dtype=X.dtype, device=X.device)
 
-
+# Binary cross entropy
 criterion = torch.nn.BCEWithLogitsLoss()
 
 
