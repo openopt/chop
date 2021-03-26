@@ -20,6 +20,9 @@ jobs:
     steps:
     - name: Uploading docs to gcs
       uses: actions-hub/gcloud@master
+      env:
+        PROJECT_ID: test
+        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
       with:
         args: ls gs://openo.pt/chop
         cli: gsutil
