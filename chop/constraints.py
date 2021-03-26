@@ -30,7 +30,7 @@ def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
 
 
 @torch.no_grad()
-def create_lp_constraints(model, p=2, value=300, mode='initialization'):
+def make_Lp_model_constraints(model, p=2, value=300, mode='initialization'):
     """Create LpBall constraints for each layer of model, and value depends on mode (either radius or
     factor to multiply average initialization norm with)"""
     constraints = []
@@ -63,6 +63,23 @@ def create_lp_constraints(model, p=2, value=300, mode='initialization'):
         constraints.append(constraint)
     return constraints
 
+
+@torch.no_grad()
+def make_feasible(model, proxes):
+    """
+    Projects all parameters of model onto the associated constraint set,
+    using its prox operator (really a projection here).
+    This function operates in-place.
+
+    Args:
+      model: torch.nn.Module
+        Model to make feasible
+      prox: [callable]
+        List of projection operators
+    """
+    for param, prox in zip(model.parameters(), proxes):
+        if prox is not None:
+            param.copy_(prox(param.unsqueeze(0)).squeeze(0))
 
 @torch.no_grad()
 def euclidean_proj_simplex(v, s=1.):
@@ -204,18 +221,54 @@ class LpBall:
         for idx, (name, param) in enumerate(model.named_parameters()):
             param.copy_(self.prox(param))
 
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        """Checks if x is a feasible point of the constraint."""
+        p_norms = (x ** self.p).reshape(x.size(0), -1).sum(-1)
+        return p_norms.pow(1. / self.p) <= self.alpha * (1. + rtol) + atol
+
 
 class LinfBall(LpBall):
     p = np.inf
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """Projection onto the L-infinity ball.
+
+        Args:
+          x: torch.Tensor of shape (batchs_size, *)
+            tensor to project
+          step_size: Any
+            Not used here
+        
+        Returns:
+          p: torch.Tensor, same shape as x
+            projection of x onto the L-infinity ball.
+        """
         if torch.max(abs(x)) <= self.alpha:
             return x
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
+        """Linear Maximization Oracle.
+        Return s - iterate with s solving the linear problem
+
+        ..math::
+            max_{||s||_\infty <= alpha} <grad, s>
+
+        Args:
+          grad: torch.Tensor of shape (batch_size, *)
+              usually -gradient
+          iterate: torch.Tensor of shape (batch_size, *)
+              usually the iterate of the considered algorithm
+
+        Returns:
+          update_direction: torch.Tensor, same shape as grad and iterate,
+              s - iterate, where s is the vertex of the constraint most correlated
+              with u
+          max_step_size: torch.Tensor of shape (batch_size,)
+              1. for a Frank-Wolfe step.
+        """
         update_direction = -iterate.clone().detach()
         update_direction += self.alpha * torch.sign(grad)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
@@ -236,15 +289,34 @@ class LinfBall(LpBall):
         max_step = self.active_set[away_direction]
         away_direction = torch.tensor(away_direction)
         return fw_direction - away_direction, max_step
-        
+
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        return abs(x).reshape(x.size(0), -1).max(dim=-1)[0] <= self.alpha * (1. + rtol) + atol
+
 
 class L1Ball(LpBall):
     p = 1
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
-        """Returns s-x, s solving the linear problem
-        max_{\|s\|_1 <= \\alpha} \\langle grad, s\\rangle
+        """Linear Maximization Oracle.
+        Return s - iterate with s solving the linear problem
+
+        ..math::
+            max_{||s||_1 <= alpha} <grad, s>
+
+        Args:
+          grad: torch.Tensor of shape (batch_size, *)
+              usually -gradient
+          iterate: torch.Tensor of shape (batch_size, *)
+              usually the iterate of the considered algorithm
+
+        Returns:
+          update_direction: torch.Tensor, same shape as grad and iterate,
+              s - iterate, where s is the vertex of the constraint most correlated
+              with u
+          max_step_size: torch.Tensor of shape (batch_size,)
+              1. for a Frank-Wolfe step.
         """
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
@@ -260,6 +332,18 @@ class L1Ball(LpBall):
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
+        """Projection onto the L1 ball.
+
+        Args:
+          x: torch.Tensor of shape (batchs_size, *)
+            tensor to project
+          step_size: Any
+            Not used here
+        
+        Returns:
+          p: torch.Tensor, same shape as x
+            projection of x onto the L1 ball.
+        """
         shape = x.shape
         flattened_x = x.view(shape[0], -1)
         # TODO vectorize this
@@ -273,21 +357,47 @@ class L2Ball(LpBall):
 
     @torch.no_grad()
     def prox(self, x, step_size=None):
-        shape = x.shape
+        """Projection onto the L2 ball.
+
+        Args:
+          x: torch.Tensor of shape (batchs_size, *)
+            tensor to project
+          step_size: Any
+            Not used here
+        
+        Returns:
+          p: torch.Tensor, same shape as x
+            projection of x onto the L2 ball.
+        """
         norms = utils.bnorm(x)
         mask = norms > self.alpha
         projected = x.clone().detach()
-        projected[mask] = utils.bdiv(projected[mask], norms[mask])
-        return self.alpha * projected.view(shape)
+        projected[mask] = self.alpha * utils.bdiv(projected[mask], norms[mask])
+        return projected
 
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
+        """Linear Maximization Oracle.
+        Return s - iterate with s solving the linear problem
+
+        ..math::
+            max_{||s||_2 <= alpha} <grad, s>
+
+        Args:
+          grad: torch.Tensor of shape (batch_size, *)
+              usually -gradient
+          iterate: torch.Tensor of shape (batch_size, *)
+              usually the iterate of the considered algorithm
+
+        Returns:
+          update_direction: torch.Tensor, same shape as grad and iterate,
+              s - iterate, where s is the vertex of the constraint most correlated
+              with u
+          max_step_size: torch.Tensor of shape (batch_size,)
+              1. for a Frank-Wolfe step.
         """
-        Returns s-x, s solving the linear problem
-        max_{\|s\|_2 <= \\alpha} \\langle grad, s\\rangle
-        """
-        update_direction = iterate.clone().detach()
+        update_direction = -iterate.clone().detach()
         grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
         update_direction += self.alpha * (grad.view(grad.size(0), -1).T
                                             / grad_norms).T.view_as(iterate)
@@ -322,14 +432,21 @@ class Simplex:
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
-        largest_coordinate = torch.where(grad == grad.max())
+        batch_size = grad.size(0)
+        shape = iterate.shape
+        max_vals, max_idx = grad.reshape(batch_size, -1).max(-1)
 
-        update_direction = -iterate.clone().detach()
-        update_direction[largest_coordinate] += self.alpha * torch.sign(
-            grad[largest_coordinate]
-        )
+        update_direction = -iterate.clone().detach().reshape(batch_size, -1)
+        update_direction[range(batch_size), max_idx] += self.alpha
+        update_direction = update_direction.reshape(*shape)
 
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
+
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        batch_size = x.size(0)
+        reshaped_x = x.reshape(batch_size, -1)
+        return torch.logical_and(reshaped_x.min(dim=-1)[0] + atol >= 0,
+                                 reshaped_x.sum(-1) <= self.alpha * (1. + rtol) + atol) 
 
 
 class NuclearNormBall:
@@ -348,9 +465,10 @@ class NuclearNormBall:
         """
         Computes the LMO for the Nuclear Norm Ball on the last two dimensions.
         Returns :math: `s - $iterate$` where
-        
+
           ..math::
             s = \argmax_u u^\top grad.
+
         Args:
           grad: torch.Tensor of shape (*, m, n)
           iterate: torch.Tensor of shape (*, m, n)
@@ -393,7 +511,7 @@ class GroupL1Ball:
             groups = [torch.tensor(group) for group in groups]
         while groups[0].dim() < 2:
             groups = [group.unsqueeze(-1) for group in groups]
-        
+
         self.groups = []
         for g in groups:
             self.groups.append((...,) + tuple(g.T))
@@ -427,7 +545,7 @@ class GroupL1Ball:
     @torch.no_grad()
     def prox(self, x, step_size=None):
         """Proximal operator for the GroupL1 constraint"""
-        
+
         group_norms = self.get_group_norms(x)
         l1ball = L1Ball(self.alpha)
         normalized_group_norms = l1ball.prox(group_norms)
@@ -442,25 +560,34 @@ class GroupL1Ball:
 
         return output
 
-    def is_feasible(self, x, tol=5e-7):
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         group_norms = self.get_group_norms(x)
-        return (torch.linalg.norm(group_norms, ord=1, dim=-1) <= self.alpha + tol).all()
+        return torch.linalg.norm(group_norms, ord=1, dim=-1) <= (self.alpha * (1. + rtol)
+                                                                 + atol)
 
 
 class Box:
     """
     Box constraint.
     Args:
-        a: float
+        a: float or None
         min of the box constraint
-        b: float
+        b: float or None
         max of the box constraint
     """
-    def __init__(self, a, b):
+    def __init__(self, a=None, b=None):
         """
           """
-        if b < a:
-            raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
+
+        if a is None and b is None:
+            raise ValueError("One of a, b should not be None.")
+        if a is None:
+            a = -np.inf
+        elif b is None:
+            b = np.inf
+        else:
+            if b < a:
+                raise ValueError(f"This constraint supposes that a <= b. Got {a}, {b}.")
         self.a = a
         self.b = b
 
@@ -473,7 +600,12 @@ class Box:
           x_thresh: torch.Tensor
             x clamped between a and b.
         """
-        return torch.clamp(x, self.a, self.b)
+        return torch.clamp(x, min=self.a, max=self.b)
+
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        reshaped_x = x.reshape(x.size(0), -1)
+        return torch.logical_and(reshaped_x.min(-1)[0] >= self.a * (1. + rtol) - atol,
+                                 reshaped_x.max(-1)[0] <= self.b * (1. + rtol) + atol)
 
 
 class Cone:
@@ -543,5 +675,8 @@ class Cone:
         res[project_idx] = utils.bmul((self.alpha * norm_p_orth_u[project_idx] + uTx[project_idx]) / (1. + self.alpha ** 2), 
                                       (self.alpha * utils.bmul(p_orth_u[project_idx], 1 / norm_p_orth_u[project_idx])
                                        + self.directions[project_idx]))
-
         return res
+
+    def is_feasible(self, x, rtol=1e-5, atol=1e-7):
+        cosines = utils.bdot(x, self.directions)
+        return abs(cosines) >= utils.bnorm(x) * self.cos_angle * (1. + rtol) + atol
