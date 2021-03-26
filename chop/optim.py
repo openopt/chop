@@ -297,6 +297,10 @@ def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
     x = x0.detach().clone()
     batch_size = x.size(0)
 
+    if prox is None:
+        def prox(x, s=None):
+            return x
+
     if step is None:
         # estimate lipschitz constant
         L = utils.init_lipschitz(closure, x0)
