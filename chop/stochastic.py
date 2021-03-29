@@ -444,16 +444,32 @@ class FrankWolfe(Optimizer):
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, lmo, lr=.1, momentum=.9, 
+    def __init__(self, params, lmo, lr=.1, momentum=.9,
                  weight_decay=0.,
                  normalization='none'):
 
-        self.lmo = []
+        lmo_candidates = []
         for oracle in lmo:
-            def _lmo(u, x):
-                update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
-                return update_direction.squeeze(dim=0), max_step_size
-            self.lmo.append(_lmo)
+            if oracle is None:
+                # Then FW will not be used on this parameter
+                _lmo = None
+            else:
+                def _lmo(u, x):
+                    update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
+                    return update_direction.squeeze(dim=0), max_step_size
+            lmo_candidates.append(_lmo)
+
+        self.lmo = []
+        useable_params = []
+        for param, oracle in zip(params, lmo):
+            if oracle:
+                useable_params.append(param)
+                self.lmo.append(oracle)
+            else:
+                msg = (f"No LMO was provided for parameter {param}. "
+                       f"Frank-Wolfe will not optimize this parameter. "
+                       f"Please use another optimizer.")
+                warnings.warn(msg)
 
         if type(lr) == float:
             if not (0. < lr <= 1.):
@@ -473,7 +489,7 @@ class FrankWolfe(Optimizer):
                         momentum=self.momentum,
                         weight_decay=weight_decay,
                         normalization=self.normalization)
-        super(FrankWolfe, self).__init__(params, defaults)
+        super(FrankWolfe, self).__init__(useable_params, defaults)
 
     @property
     @torch.no_grad()

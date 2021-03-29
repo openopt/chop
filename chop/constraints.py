@@ -30,7 +30,7 @@ def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
 
 
 @torch.no_grad()
-def make_Lp_model_constraints(model, p=2, value=300, mode='initialization'):
+def make_Lp_model_constraints(model, p=2, value=300, mode='initialization', constrain_bias=False):
     """Create LpBall constraints for each layer of model, and value depends on mode (either radius or
     factor to multiply average initialization norm with)"""
     constraints = []
@@ -53,13 +53,17 @@ def make_Lp_model_constraints(model, p=2, value=300, mode='initialization'):
                     init_norms[shape] = avg_norm
 
     for name, param in model.named_parameters():
-        if mode == 'radius':
-            constraint = make_LpBall(value, p=p)
-        elif mode == 'initialization':
-            alpha = value * init_norms[param.shape]
-            constraint = make_LpBall(alpha, p=p)
+        if (not constrain_bias) and ('bias' in name):
+            constraint = None
         else:
-            raise ValueError(f"Unknown mode {mode}")
+            print(name)
+            if mode == 'radius':
+                constraint = make_LpBall(value, p=p)
+            elif mode == 'initialization':
+                alpha = value * init_norms[param.shape]
+                constraint = make_LpBall(alpha, p=p)
+            else:
+                raise ValueError(f"Unknown mode {mode}")
         constraints.append(constraint)
     return constraints
 

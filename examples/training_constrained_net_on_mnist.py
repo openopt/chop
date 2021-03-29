@@ -68,17 +68,20 @@ lr = 0.3
 
 # Make constraints
 print("Preparing constraints.")
-constraints = chop.constraints.make_Lp_model_constraints(model, p=np.inf, value=10000)
-proxes = [constraint.prox for constraint in constraints]
-lmos = [constraint.lmo for constraint in constraints]
+constraints = chop.constraints.make_Lp_model_constraints(model, p=1, value=10000)
+proxes = [constraint.prox if constraint else None for constraint in constraints]
+lmos = [constraint.lmo if constraint else None for constraint in constraints]
 
 print("Projecting model parameters in their associated constraint sets.")
 chop.constraints.make_feasible(model, proxes)
 
 optimizer = chop.stochastic.FrankWolfe(model.parameters(), lmos,
                                        lr=lr, momentum=momentum,
-                                       weight_decay=0.,
+                                       weight_decay=3e-4,
                                        normalization='gradient')
+
+bias_params = [param for name, param in model.named_parameters() if 'bias' in name]
+bias_opt = chop.stochastic.PGD(bias_params, lr=1e-2)
 
 print("Training...")
 # Training loop
@@ -89,9 +92,11 @@ for epoch in range(nb_epochs):
         data, target = data.to(device), target.to(device)
 
         optimizer.zero_grad()
+        bias_opt.zero_grad()
         loss = criterion(model(data), target)
         loss.backward()
         optimizer.step()
+        bias_opt.step()
 
         train_loss += loss.item()
     train_loss /= len(loaders.train)
