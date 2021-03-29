@@ -128,7 +128,7 @@ class PGD(Optimizer):
 
     def __init__(self, params, prox=None, lr=.1, momentum=.9, normalization='none'):
         if prox is None:
-            prox = [None] * len(params)
+            prox = [None] * len(list(params))
 
         self.prox = []
         for prox_el in prox:

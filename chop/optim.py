@@ -249,7 +249,7 @@ def backtracking_pgd(closure, prox, step_size, x, grad, increase=1.01, decrease=
                                       dim=-1))) ** 2
 
 
-def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
+def minimize_pgd(closure, x0, prox=None, step='backtracking', max_iter=200,
                  max_iter_backtracking=1000,
                  backtracking_factor=.6,
                  tol=1e-8,
@@ -317,10 +317,8 @@ def minimize_pgd(closure, x0, prox, step='backtracking', max_iter=200,
         raise ValueError("step must be float or backtracking or None")
 
     for it in range(max_iter):
-        x.requires_grad = True
 
         fval, grad = closure(x)
-
         x_next = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
         update_direction = x_next - x
 
