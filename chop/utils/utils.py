@@ -34,6 +34,7 @@ def closure(f):
         """Adds jacobian computation when calling function.
         When return_jac is True, returns (value, jacobian)
         instead of just value."""
+        x.requires_grad_(True)
         if not return_jac:
             val = f(x, *args, **kwargs)
             if val.ndim == 0:
