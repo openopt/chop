@@ -1,10 +1,12 @@
 """
-L2 penalized logistic regression
+L2-penalized Logistic Regression (full-batch)
 ==================================
 
 L2 penalized (unconstrained) logistic regression on the Covtype dataset.
 Uses full-batch gradient descent with line-search.
 """
+
+import numpy as np
 
 import torch
 from torch import nn
@@ -34,7 +36,7 @@ scaler = StandardScaler()
 X = scaler.fit_transform(X)
 
 X = torch.tensor(X, dtype=torch.float32, device=device)
-y = torch.tensor(y > 0, dtype=torch.float32, device=device)
+y = torch.tensor(y, dtype=torch.float32, device=device)
 
 n_datapoints, n_features = X.shape
 
@@ -42,34 +44,29 @@ n_datapoints, n_features = X.shape
 x0 = torch.zeros(1, n_features, dtype=X.dtype, device=X.device)
 
 # Binary cross entropy
-criterion = torch.nn.BCEWithLogitsLoss()
-
-
 @chop.utils.closure
-def logloss(x, pen=lmbd):
-    alpha = pen / n_datapoints
-    out = chop.utils.bmv(X, x)
-    loss = criterion(out, y)
-    reg = .5 * alpha * x.pow(2).sum()
-    return loss + reg
+def logloss_reg(x, pen=lmbd):
+    y_X_x = y * (X @ x.flatten())
+    l2 = 0.5 * x.pow(2).sum()
+    logloss = torch.log1p(torch.exp(-y_X_x)).sum()
+    return (logloss + pen * l2) / X.size(0)
 
 
 @torch.no_grad()
 def log_accuracy(kwargs):
-    out = chop.utils.bmv(X, kwargs['x'])
-    out = torch.sigmoid(out)
-    acc = (out.detach().cpu().numpy().round() == y.cpu().numpy()).mean()
+    out = X @ kwargs['x'].flatten()
+    acc = (torch.sign(out).detach().cpu().numpy().round() == y.cpu().numpy()).mean()
     return acc
 
 
 callback = chop.utils.logging.Trace(callable=lambda kwargs: (log_accuracy(kwargs),
-                                                             logloss(kwargs['x'], pen=0.,
-                                                                     return_jac=False)))
+                                                             logloss_reg(kwargs['x'], pen=0.,
+                                                                         return_jac=False).item()))
 
-result = chop.optim.minimize_pgd(logloss, x0, callback=callback, max_iter=max_iter)
+result = chop.optim.minimize_pgd(logloss_reg, x0, callback=callback, max_iter=max_iter, step='backtracking')
 
 fig = plt.figure()
-plt.plot([val.item() for val in callback.trace_f])
+plt.plot(np.array([val.item() for val in callback.trace_f]).clip(0, 1))
 plt.title("Regularized Loss")
 plt.show()
 
@@ -80,4 +77,4 @@ for name, vals in (('Accuracy', accuracies),
     fig = plt.figure()
     plt.title(name)
     plt.plot(vals)
-    plt.show
+    plt.show()
