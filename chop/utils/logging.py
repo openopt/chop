@@ -32,8 +32,8 @@ class Trace:
             self.closure = kwargs['closure']
         
         if self._counter % self.freq == 0:
-            self.trace_x.append(kwargs['x'].data)
-            self.trace_f.append(self.closure(kwargs['x'], return_jac=False).data)
+            self.trace_x.append(kwargs['x'].detach().clone().data)
+            self.trace_f.append(self.closure(kwargs['x'], return_jac=False).clone().data)
             try:
                 self.trace_callable.append(self.callable(kwargs))
             except AttributeError:
