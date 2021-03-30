@@ -150,7 +150,9 @@ class PGD(Optimizer):
             self.normalization = normalization
         else:
             raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
-        defaults = dict(prox=self.prox, name=self.name, normalization=self.normalization)
+        defaults = dict(prox=self.prox, name=self.name,
+                        momentum=self.momentum, lr=self.lr,
+                        normalization=self.normalization)
         super(PGD, self).__init__(params, defaults)
 
     @property
