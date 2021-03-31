@@ -133,7 +133,7 @@ class PGD(Optimizer):
         self.prox = []
         for prox_el in prox:
             if prox_el is not None:
-                self.prox.append(lambda x, s=None: prox_el(x.unsqueeze(0)).squeeze())
+                self.prox.append(lambda x, s=None: prox_el(x.unsqueeze(0), s).squeeze(0))
             else:
                 self.prox.append(lambda x, s=None: x)
 
@@ -141,9 +141,8 @@ class PGD(Optimizer):
             raise ValueError("lr must be float or 'sublinear'.")
         self.lr = lr
 
-        if type(momentum) == float:
-            if not(0. <= momentum <= 1.):
-                raise ValueError("Momentum must be in [0., 1.].")
+        if not(0. <= momentum <= 1.):
+            raise ValueError("Momentum must be in [0., 1.].")
         self.momentum = momentum
 
         if normalization in self.POSSIBLE_NORMALIZATIONS:
@@ -198,7 +197,7 @@ class PGD(Optimizer):
                 if self.lr == 'sublinear':
                     step_size = 1. / (state['step'] + 1.)
                 else:
-                    step_size = self.lr
+                    step_size = state['lr']
 
                 new_p = self.prox[idx](p - step_size * grad_est, 1.)
                 state['certificate'] = torch.norm((p - new_p) / step_size)
@@ -251,8 +250,8 @@ class PGDMadry(Optimizer):
         if not (type(lr) == float or lr == 'sublinear'):
             raise ValueError("lr must be float or 'sublinear'.")
 
-        self.lr = lr
-        defaults = dict(prox=self.prox, lmo=self.lmo, name=self.name)
+        defaults = dict(prox=self.prox, lmo=self.lmo, lr=lr,
+                        name=self.name)
         super(PGDMadry, self).__init__(params, defaults)
 
     @property
@@ -271,8 +270,8 @@ class PGDMadry(Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
-        idx = 0
         for groups in self.param_groups:
+            idx = 0
             for p in groups['params']:
                 if p.grad is None:
                     continue
@@ -286,10 +285,10 @@ class PGDMadry(Optimizer):
                     state['step'] = 0.
                 state['step'] += 1.
 
-                if self.lr == 'sublinear':
+                if state['lr'] == 'sublinear':
                     step_size = 1. / (state['step'] + 1.)
                 else:
-                    step_size = self.lr
+                    step_size = state['lr']
                 lmo_res, _ = self.lmo[idx](-p.grad, p)
                 normalized_grad = lmo_res + p
                 new_p = self.prox[idx](p + step_size * normalized_grad)
@@ -446,7 +445,7 @@ class FrankWolfe(Optimizer):
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, lmo, lr=.1, momentum=.9,
+    def __init__(self, params, lmo, lr=.1, momentum=0.,
                  weight_decay=0.,
                  normalization='none'):
 
@@ -553,5 +552,109 @@ class FrankWolfe(Optimizer):
                 elif self.normalization == 'none':
                     pass
                 p.add_(step_size * update_direction)
+                idx += 1
+        return loss
+
+
+class SplittingProxFW(Optimizer):
+    # TODO: write docstring!
+
+    name = 'Hybrid Prox FW Splitting'
+
+    POSSIBLE_NORMALIZATIONS = {'none', 'gradient'}
+
+    def __init__(self, params, lmo, prox=None,
+                 lr_lmo=.1,
+                 lr_prox=.1,
+                 momentum=0., weight_decay=0.,
+                 normalization='none'):
+
+        self.lmo = []
+        for oracle in lmo:
+            if oracle is None:
+                # Then FW will not be used on this parameter
+                raise ValueError("LMOs cannot be None for this optimizer.")
+            else:
+                def _lmo(u, x):
+                    update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
+                    return update_direction.squeeze(dim=0), max_step_size
+            self.lmo.append(_lmo)
+
+        if prox is None:
+            prox = [None] * len(list(params))
+
+        self.prox = []
+        for prox_el in prox:
+            if prox_el is not None:
+                self.prox.append(lambda x, s=None: prox_el(x.unsqueeze(0), s).squeeze(0))
+            else:
+                self.prox.append(lambda x, s=None: x)
+
+        for name, lr in (('lr_lmo', lr_lmo),
+                         ('lr_prox', lr_prox)):
+            if not type(lr) == float:
+                msg = f"{name} should be a float, got {lr}."
+                raise ValueError(msg)
+
+        if not(0. <= momentum <= 1.):
+            raise ValueError("omentum must be in [0., 1.].")
+
+        if not (weight_decay >= 0):
+            raise ValueError("weight_decay must be nonnegative.")
+        self.weight_decay = weight_decay
+
+        if normalization not in self.POSSIBLE_NORMALIZATIONS:
+            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
+        defaults = dict(lmo=self.lmo, prox=self.prox,
+                        name=self.name,
+                        momentum=momentum,
+                        lr_lmo=lr_lmo,
+                        lr_prox=lr_prox,
+                        weight_decay=weight_decay,
+                        normalization=normalization)
+
+        super(SplittingProxFW, self).__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        """Performs a single optimization step.
+        Arguments:
+            closure (callable, optional): A closure that reevaluates the model
+                and returns the loss
+        """
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+        for group in self.param_groups:
+            idx = 0
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                grad = p.grad + self.weight_decay * p
+
+                if grad.is_sparse:
+                    raise RuntimeError("We do not yet support sparse gradients.")
+                # Keep track of the step
+                state = self.state[p]
+                
+                # Initialization
+                if len(state) == 0:
+                    state['step'] = 0.
+                    # split variable: p = x + y
+                    state['x'] = .5 * p.detach().clone()
+                    state['y'] = .5 * p.detach().clone()
+                state['step'] += 1.
+
+                y_update, max_step_size = self.lmo[idx](-grad, state['y'])
+                state['lr_lmo'] = torch.minimum(state['lr_lmo'], max_step_size)
+                w = y_update + state['y']
+                v = self.prox[idx](state['x'] + state['y'] - w - grad / state['lr_prox'], state['lr_prox'])
+
+                state['y'].add_(y_update, alpha=state['lr_lmo'])
+                x_update = v - state['x']
+                state['x'].add_(x_update, alpha=state['lr_lmo'])
+
+                p.copy_(state['x'] + state['y'])
                 idx += 1
         return loss
