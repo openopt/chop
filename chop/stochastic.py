@@ -569,35 +569,50 @@ class SplittingProxFW(Optimizer):
                  momentum=0., weight_decay=0.,
                  normalization='none'):
 
-        self.lmo = []
+        # initialize proxes
+        if prox is None:
+            prox = [None] * len(list(params))
+
+        prox_candidates = []
+        for prox_el in prox:
+            if prox_el is not None:
+                prox_candidates.append(lambda x, s=None: prox_el(x.unsqueeze(0), s).squeeze(0))
+            else:
+                prox_candidates.append(lambda x, s=None: x)
+        # initialize lmos
+        lmo_candidates = []
         for oracle in lmo:
             if oracle is None:
                 # Then FW will not be used on this parameter
-                raise ValueError("LMOs cannot be None for this optimizer.")
+                _lmo = None
             else:
                 def _lmo(u, x):
                     update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
                     return update_direction.squeeze(dim=0), max_step_size
-            self.lmo.append(_lmo)
+            lmo_candidates.append(_lmo)
 
-        if prox is None:
-            prox = [None] * len(list(params))
-
+        self.lmo = []
         self.prox = []
-        for prox_el in prox:
-            if prox_el is not None:
-                self.prox.append(lambda x, s=None: prox_el(x.unsqueeze(0), s).squeeze(0))
+        useable_params = []
+        for param, lmo_oracle, prox_oracle in zip(params, lmo_candidates, prox_candidates):
+            if lmo_oracle:
+                useable_params.append(param)
+                self.lmo.append(lmo_oracle)
+                self.prox.append(prox_oracle)
             else:
-                self.prox.append(lambda x, s=None: x)
+                msg = (f"No LMO was provided for parameter {param}. "
+                       f"This optimizer will not optimize this parameter. "
+                       f"Please pass this parameter to another optimizer.")
+                warnings.warn(msg)
 
         for name, lr in (('lr_lmo', lr_lmo),
                          ('lr_prox', lr_prox)):
-            if not type(lr) == float:
-                msg = f"{name} should be a float, got {lr}."
+            if not ((type(lr) == float) or lr == 'sublinear'):
+                msg = f"{name} should be a float or 'sublinear', got {lr}."
                 raise ValueError(msg)
 
         if not(0. <= momentum <= 1.):
-            raise ValueError("omentum must be in [0., 1.].")
+            raise ValueError("momentum must be in [0., 1.].")
 
         if not (weight_decay >= 0):
             raise ValueError("weight_decay must be nonnegative.")
@@ -631,25 +646,34 @@ class SplittingProxFW(Optimizer):
             for p in group['params']:
                 if p.grad is None:
                     continue
-                grad = p.grad + self.weight_decay * p
-
+                grad = p.grad
+                state = self.state[p]
                 if grad.is_sparse:
                     raise RuntimeError("We do not yet support sparse gradients.")
                 # Keep track of the step
-                state = self.state[p]
-                
+                grad += group['weight_decay'] * p
                 # Initialization
                 if len(state) == 0:
                     state['step'] = 0.
                     # split variable: p = x + y
                     state['x'] = .5 * p.detach().clone()
                     state['y'] = .5 * p.detach().clone()
+                    # initialize grad estimate
+                    state['grad_est'] = grad
+                    # initialize learning rates
+                    state['lr_prox'] = group['lr_prox'] if type(group['lr_prox'] == float) else 0.
+                    state['lr_lmo'] = group['lr_lmo'] if type(group['lr_lmo'] == float) else 0.
                 state['step'] += 1.
+                state['grad_est'].add_(grad, alpha=1. - group['momentum'])
 
-                y_update, max_step_size = self.lmo[idx](-grad, state['y'])
-                state['lr_lmo'] = torch.minimum(state['lr_lmo'], max_step_size)
+                for lr in ('lr_prox', 'lr_lmo'):
+                    if group[lr] == 'sublinear':
+                        state[lr] = 2. / (state['step'] + 2)
+
+                y_update, max_step_size = group['lmo'][idx](-state['grad_est'], state['y'])
+                state['lr_lmo'] = min(state['lr_lmo'], max_step_size)
                 w = y_update + state['y']
-                v = self.prox[idx](state['x'] + state['y'] - w - grad / state['lr_prox'], state['lr_prox'])
+                v = group['prox'][idx](state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], group['lr_prox'])
 
                 state['y'].add_(y_update, alpha=state['lr_lmo'])
                 x_update = v - state['x']
