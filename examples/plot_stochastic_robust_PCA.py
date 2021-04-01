@@ -20,6 +20,7 @@ import chop
 from chop import utils
 from chop.utils.logging import Trace
 
+torch.manual_seed(0)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -53,7 +54,7 @@ for r, p in r_p:
     M = M.to(device)
 
     def sqloss(Z, M):
-        return .5 / M.numel() * torch.linalg.norm((Z - M).squeeze(), ord='fro') ** 2
+        return .5 / Z.numel() * torch.linalg.norm((Z - M).squeeze(), ord='fro') ** 2
 
     rnuc = torch.linalg.norm(L.squeeze(), ord='nuc')
     sL1 = abs(S).sum()
@@ -70,33 +71,44 @@ for r, p in r_p:
     Z = torch.zeros_like(M, device=device)
     Z.requires_grad_(True)
 
-    sampler = torch.utils.data.BatchSampler(torch.utils.data.RandomSampler(range(M.size(0))),
-                                            batch_size=100,
-                                            drop_last=False)
+    batch_sizes = [100, 250, 500, 1000]
+    fig, axes = plt.subplots(ncols=len(batch_sizes), figsize=(18, 10))
 
-    optimizer = chop.stochastic.SplittingProxFW([Z], lmo=[lmo], prox=[prox],
-                                                lr_lmo='sublinear',
-                                                lr_prox='sublinear',
-                                                normalization='none')
+    for batch_size, ax in zip(batch_sizes, axes):
+        print(f"Batch size: {batch_size}")
+        sampler = torch.utils.data.BatchSampler(torch.utils.data.RandomSampler(range(M.size(0))),
+                                                batch_size=batch_size,
+                                                drop_last=True)
 
-    train_losses = []
-    losses = []
+        optimizer = chop.stochastic.SplittingProxFW([Z], lmo=[lmo], prox=[prox],
+                                                    lr_lmo='sublinear',
+                                                    lr_prox='sublinear',
+                                                    normalization='none',
+                                                    # weight_decay=1e-8,
+                                                    momentum=.9)
 
-    for it in range(n_epochs):
-        for idx in sampler:
-            optimizer.zero_grad()
-            loss = sqloss(Z[idx], M[idx])
-            # for logging
-            with torch.no_grad():
-                full_loss = sqloss(Z, M)
-                losses.append(full_loss.item())
-            train_losses.append(loss.item())
-            loss.backward()
-            optimizer.step()
-
-
-    plt.plot(train_losses, label='training_losses')
-    plt.plot(losses, label='loss')
-    plt.ylim(0, 250)
-    plt.legend()
+        train_losses = []
+        losses = []
+        sgrad_avg = 0
+        n_it = 0
+        for it in range(n_epochs):
+            for idx in sampler:
+                n_it += 1
+                optimizer.zero_grad()
+                loss = sqloss(Z[idx], M[idx])
+                train_losses.append(loss.item())
+                loss.backward()
+                sgrad = Z.grad.detach().clone()
+                sgrad_avg += sgrad
+                # for logging
+                with torch.no_grad():
+                    full_loss = sqloss(Z, M)
+                    losses.append(full_loss.item())
+                optimizer.step()
+        ax.set_title(f"b={batch_size}")
+        ax.plot(train_losses, label='training_losses')
+        ax.plot(losses, label='loss')
+        ax.set_ylim(0, 250)
+        ax.legend()
+    plt.savefig("robustPCA_stoch.png")
     print("Done.")

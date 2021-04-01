@@ -611,8 +611,8 @@ class SplittingProxFW(Optimizer):
                 msg = f"{name} should be a float or 'sublinear', got {lr}."
                 raise ValueError(msg)
 
-        if not(0. <= momentum <= 1.):
-            raise ValueError("momentum must be in [0., 1.].")
+        if (momentum != 'sublinear') and (not (0. <= momentum <= 1.)):
+            raise ValueError("momentum must be in [0., 1.] or 'sublinear'.")
 
         if not (weight_decay >= 0):
             raise ValueError("weight_decay must be nonnegative.")
@@ -651,7 +651,8 @@ class SplittingProxFW(Optimizer):
                 if grad.is_sparse:
                     raise RuntimeError("We do not yet support sparse gradients.")
                 # Keep track of the step
-                grad += group['weight_decay'] * p
+                grad += .5 * group['weight_decay'] * p
+
                 # Initialization
                 if len(state) == 0:
                     state['step'] = 0.
@@ -659,16 +660,21 @@ class SplittingProxFW(Optimizer):
                     state['x'] = .5 * p.detach().clone()
                     state['y'] = .5 * p.detach().clone()
                     # initialize grad estimate
-                    state['grad_est'] = grad
+                    state['grad_est'] = torch.zeros_like(p)
                     # initialize learning rates
                     state['lr_prox'] = group['lr_prox'] if type(group['lr_prox'] == float) else 0.
                     state['lr_lmo'] = group['lr_lmo'] if type(group['lr_lmo'] == float) else 0.
-                state['step'] += 1.
-                state['grad_est'].add_(grad, alpha=1. - group['momentum'])
+                    state['momentum'] = group['momentum'] if type(group['momentum'] == float) else 0.
 
                 for lr in ('lr_prox', 'lr_lmo'):
                     if group[lr] == 'sublinear':
                         state[lr] = 2. / (state['step'] + 2)
+                
+                if group['momentum'] == 'sublinear':
+                    state['momentum'] = 4. / (state['step'] + 8.) ** (2/3)
+
+                state['step'] += 1.
+                state['grad_est'].add_(grad - state['grad_est'], alpha=1. - state['momentum'])
 
                 y_update, max_step_size = group['lmo'][idx](-state['grad_est'], state['y'])
                 state['lr_lmo'] = min(state['lr_lmo'], max_step_size)
