@@ -10,6 +10,7 @@ Part of this code is adapted from https://github.com/ZIB-IOL."""
 
 from copy import deepcopy
 from collections import defaultdict
+import warnings
 
 import torch
 
@@ -30,13 +31,19 @@ def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
 
 
 @torch.no_grad()
-def make_Lp_model_constraints(model, p=2, value=300, mode='initialization', constrain_bias=False):
-    """Create LpBall constraints for each layer of model, and value depends on mode (either radius or
+def make_model_constraints(model, ord=2, value=300, mode='initialization', constrain_bias=False):
+    """Create Ball constraints for each layer of model. Ball radius depends on mode (either radius or
     factor to multiply average initialization norm with)"""
     constraints = []
 
     # Compute average init norms if necessary
     init_norms = dict()
+
+    if ord == 'nuc' and constrain_bias:
+        msg = "'nuc' constraints cannot constrain bias."
+        warnings.warn(msg)
+        constrain_bias = False
+
     if mode == 'initialization':
         for layer in model.modules():
             if hasattr(layer, 'reset_parameters'):
@@ -58,12 +65,19 @@ def make_Lp_model_constraints(model, p=2, value=300, mode='initialization', cons
         else:
             print(name)
             if mode == 'radius':
-                constraint = make_LpBall(value, p=p)
+                alpha = value
             elif mode == 'initialization':
                 alpha = value * init_norms[param.shape]
-                constraint = make_LpBall(alpha, p=p)
             else:
-                raise ValueError(f"Unknown mode {mode}")
+                msg = f"Unknown mode {mode}."
+                raise ValueError(msg)
+        if (type(ord) == int) or (ord == np.inf):
+            constraint = make_LpBall(alpha, p=ord)
+        elif ord == 'nuc':
+            constraint = NuclearNormBall(alpha)
+        else:
+            msg = f"ord {ord} is not supported."
+            raise ValueError(msg)
         constraints.append(constraint)
     return constraints
 

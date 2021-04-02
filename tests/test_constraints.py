@@ -4,7 +4,9 @@ import numpy as np
 
 import torch
 from torch import nn
+from torchvision import models
 import torch.nn.functional as F
+
 import chop
 from chop import utils
 from chop.utils.image import group_patches
@@ -140,8 +142,9 @@ def test_feasible(Constraint, alpha):
             pass
 
 
-@pytest.mark.parametrize('p', [1, 2, np.inf])
-def test_model_constraint_maker(p):
+@pytest.mark.parametrize('ord', [1, 2, np.inf, 'nuc'])
+@pytest.mark.parametrize('constrain_bias', [True, False])
+def test_model_constraint_maker(ord, constrain_bias):
 
     class Net(nn.Module):
         def __init__(self):
@@ -169,11 +172,13 @@ def test_model_constraint_maker(p):
             return output
 
     model = Net()
-    constraints = chop.constraints.make_Lp_model_constraints(model, p)
+    constraints = chop.constraints.make_model_constraints(model, ord, constrain_bias=constrain_bias)
 
     assert len(constraints) == len(list(model.parameters()))
 
     chop.constraints.make_feasible(model, [constraint.prox for constraint in constraints])
 
     for param, constraint in zip(model.parameters(), constraints):
-        assert torch.allclose(param, constraint.prox(param.unsqueeze(0)).squeeze(0), atol=1e-5)
+        if constraint:
+            assert torch.allclose(param, constraint.prox(param.unsqueeze(0)).squeeze(0), atol=1e-5)
+
