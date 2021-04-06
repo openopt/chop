@@ -30,6 +30,10 @@ def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
     return float(output) / repetitions
 
 
+def is_bias(name, param):
+    return ('bias' in name) or (param.ndim < 2)
+
+
 @torch.no_grad()
 def make_model_constraints(model, ord=2, value=300, mode='initialization', constrain_bias=False):
     """Create Ball constraints for each layer of model. Ball radius depends on mode (either radius or
@@ -60,8 +64,7 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
                     init_norms[shape] = avg_norm
 
     for name, param in model.named_parameters():
-        is_bias = ('bias' in name) or (param.ndim < 2)
-        if is_bias:
+        if is_bias(name, param):
             constraint = None
         else:
             print(name)

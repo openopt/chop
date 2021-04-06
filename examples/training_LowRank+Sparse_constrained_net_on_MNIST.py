@@ -25,13 +25,43 @@ device = torch.device("cuda" if use_cuda else "cpu")
 
 # Data Loaders
 print("Loading data...")
-dataset = chop.utils.data.CIFAR10("~/datasets/")
+dataset = chop.utils.data.MNIST("~/datasets/")
 loaders = dataset.loaders()
+# print("Loading data...")
+# dataset = chop.utils.data.CIFAR10("~/datasets/")
+# loaders = dataset.loaders()
 # Model setup
 
 
 print("Initializing model.")
-model = models.resnet18()
+
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.dropout1 = nn.Dropout(0.25)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        output = F.log_softmax(x, dim=1)
+        return output
+
+
+model = Net()
 model.to(device)
 
 criterion = nn.CrossEntropyLoss()
@@ -39,8 +69,8 @@ criterion = nn.CrossEntropyLoss()
 # Outer optimization parameters
 nb_epochs = 200
 momentum = .9
-lr_lmo = 0.1
-lr_prox = 0.1
+lr_lmo = 'sublinear'
+lr_prox = 'sublinear'
 
 # Make constraints
 print("Preparing constraints.")
@@ -68,12 +98,12 @@ optimizer = chop.stochastic.SplittingProxFW(model.parameters(), lmos,
                                             proxes,
                                             lr_lmo=lr_lmo, lr_prox=lr_prox,
                                             momentum=momentum,
-                                            weight_decay=5e-4,
-                                            normalization='gradient')
+                                            weight_decay=0,
+                                            normalization='none')
 
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+# scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
-bias_params = (param for name, param in model.named_parameters() if 'bias' in name)
+bias_params = (param for name, param in model.named_parameters() if chop.constraints.is_bias(name, param))
 bias_opt = chop.stochastic.PGD(bias_params, lr=1e-1)
 bias_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(bias_opt)
 
@@ -126,5 +156,5 @@ for epoch in range(nb_epochs):
     # Evaluate on clean and adversarial test data
     train()
     val_loss = eval()
-    scheduler.step(val_loss)
+    # scheduler.step(val_loss)
     bias_scheduler.step(val_loss)

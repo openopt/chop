@@ -715,11 +715,11 @@ class SplittingProxFW(Optimizer):
                     grad_norm = torch.norm(state['grad_est'])
                     for lr, direction in (('lr_prox', state['grad_est']),
                                           ('lr_lmo', y_update)):
-                        state[lr] = min(max_step_size, group[lr] *
+                        state[lr] = min(max_step_size, state[lr] *
                                         grad_norm / torch.linalg.norm(direction))
                 elif group['normalization'] == 'none':
                     for lr in ('lr_prox', 'lr_lmo'):
-                        state[lr] = min(max_step_size, group[lr])
+                        state[lr] = min(max_step_size, state[lr])
 
                 state['lr_lmo'] = min(state['lr_lmo'], max_step_size)
                 w = y_update + state['y']
