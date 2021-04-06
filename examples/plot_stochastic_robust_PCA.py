@@ -110,5 +110,4 @@ for r, p in r_p:
         ax.plot(losses, label='loss')
         ax.set_ylim(0, 250)
         ax.legend()
-    plt.savefig("robustPCA_stoch.png")
     print("Done.")

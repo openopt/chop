@@ -66,7 +66,8 @@ def backtracking_step_size(
     ratio_increase = 2.0
     max_ls_iter = 100
     if old_f_t is not None:
-        tmp = (certificate ** 2) / (2 * (old_f_t - f_t) * norm_update_direction)
+        tmp = (certificate ** 2) / \
+            (2 * (old_f_t - f_t) * norm_update_direction)
         lipschitz_t = max(min(tmp, lipschitz_t), lipschitz_t * ratio_decrease)
     for _ in range(max_ls_iter):
         step_size_t = certificate / (norm_update_direction * lipschitz_t)
@@ -76,7 +77,8 @@ def backtracking_step_size(
             step_size_t = max_step_size
             rhs = (
                 -step_size_t * certificate
-                + 0.5 * (step_size_t ** 2) * lipschitz_t * norm_update_direction
+                + 0.5 * (step_size_t ** 2) *
+                lipschitz_t * norm_update_direction
             )
         f_next, grad_next = f_grad(x + step_size_t * update_direction)
         if f_next - f_t <= rhs + EPS:
@@ -104,7 +106,7 @@ def normalize_gradient(grad, normalization):
         grad = grad / torch.norm(grad)
 
     return grad
-        
+
 
 class PGD(Optimizer):
     """Proximal Gradient Descent
@@ -127,13 +129,15 @@ class PGD(Optimizer):
     POSSIBLE_NORMALIZATIONS = {'none', 'L2', 'Linf', 'sign'}
 
     def __init__(self, params, prox=None, lr=.1, momentum=.9, normalization='none'):
+        params = list(params)
         if prox is None:
-            prox = [None] * len(list(params))
+            prox = [None] * len(params)
 
         self.prox = []
         for prox_el in prox:
             if prox_el is not None:
-                self.prox.append(lambda x, s=None: prox_el(x.unsqueeze(0), s).squeeze(0))
+                self.prox.append(lambda x, s=None: prox_el(
+                    x.unsqueeze(0), s).squeeze(0))
             else:
                 self.prox.append(lambda x, s=None: x)
 
@@ -148,7 +152,8 @@ class PGD(Optimizer):
         if normalization in self.POSSIBLE_NORMALIZATIONS:
             self.normalization = normalization
         else:
-            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
+            raise ValueError(
+                f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
         defaults = dict(prox=self.prox, name=self.name,
                         momentum=self.momentum, lr=self.lr,
                         normalization=self.normalization)
@@ -171,8 +176,8 @@ class PGD(Optimizer):
             with torch.enable_grad():
                 loss = closure()
         idx = 0
-        for groups in self.param_groups:
-            for p in groups['params']:
+        for group in self.param_groups:
+            for p in group['params']:
                 if p.grad is None:
                     continue
 
@@ -190,17 +195,19 @@ class PGD(Optimizer):
                         p, memory_format=torch.preserve_format)
 
                 state['step'] += 1.
-                state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - self.momentum)
+                state['grad_estimate'].add_(
+                    grad - state['grad_estimate'], alpha=1. - self.momentum)
 
-                grad_est = normalize_gradient(state['grad_estimate'], self.normalization)
+                grad_est = normalize_gradient(
+                    state['grad_estimate'], group['normalization'])
 
-                if self.lr == 'sublinear':
-                    step_size = 1. / (state['step'] + 1.)
+                if group['lr'] == 'sublinear':
+                    state['lr'] = 1. / (state['step'] + 1.)
                 else:
-                    step_size = state['lr']
+                    state['lr'] = group['lr']
 
-                new_p = self.prox[idx](p - step_size * grad_est, 1.)
-                state['certificate'] = torch.norm((p - new_p) / step_size)
+                new_p = self.prox[idx](p - state['lr'] * grad_est, 1.)
+                state['certificate'] = torch.norm((p - new_p) / state['lr'])
                 p.copy_(new_p)
                 idx += 1
         return loss
@@ -243,7 +250,8 @@ class PGDMadry(Optimizer):
         self.lmo = []
         for lmo_el in lmo:
             def _lmo(u, x):
-                update_direction, max_step_size = lmo_el(u.unsqueeze(0), x.unsqueeze(0))
+                update_direction, max_step_size = lmo_el(
+                    u.unsqueeze(0), x.unsqueeze(0))
                 return update_direction.squeeze(dim=0), max_step_size
             self.lmo.append(_lmo)
 
@@ -311,10 +319,10 @@ class S3CM(Optimizer):
 
       prox2: [callable or None] or None
         Proximal operator for second constraint set.
-    
+
       lr: float > 0
         Learning rate
-    
+
       normalization: str in {'none', 'L2', 'Linf', 'sign'}
         Normalizes the gradient. 'L2', 'Linf' divide the gradient by the corresponding norm.
         'sign' uses the sign of the gradient.
@@ -334,7 +342,8 @@ class S3CM(Optimizer):
         if normalization in self.POSSIBLE_NORMALIZATIONS:
             self.normalization = normalization
         else:
-            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
+            raise ValueError(
+                f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
 
         if prox1 is None:
             prox1 = [None] * len(params)
@@ -351,13 +360,14 @@ class S3CM(Optimizer):
             if prox2_ is None:
                 def prox2_(x, s=None): return x
 
-            self.prox1.append(lambda x, s=None: prox1_(x.unsqueeze(0), s).squeeze(dim=0))
-            self.prox2.append(lambda x, s=None: prox2_(x.unsqueeze(0), s).squeeze(dim=0))
+            self.prox1.append(lambda x, s=None: prox1_(
+                x.unsqueeze(0), s).squeeze(dim=0))
+            self.prox2.append(lambda x, s=None: prox2_(
+                x.unsqueeze(0), s).squeeze(dim=0))
 
         defaults = dict(lr=self.lr, prox1=self.prox1, prox2=self.prox2,
                         normalization=self.normalization)
         super(S3CM, self).__init__(params, defaults)
-
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -383,11 +393,14 @@ class S3CM(Optimizer):
                     state['step'] = 0
                     state['iterate_1'] = p.clone().detach()
                     state['iterate_2'] = self.prox2[idx](p, self.lr)
-                    state['dual'] = (state['iterate_1'] - state['iterate_2']) / self.lr
+                    state['dual'] = (state['iterate_1'] -
+                                     state['iterate_2']) / self.lr
 
-                state['iterate_2'] = self.prox2[idx](state['iterate_1'] + self.lr * state['dual'], self.lr)
-                state['dual'].add_((state['iterate_1'] - state['iterate_2']) / self.lr)
-                state['iterate_1'] = self.prox1[idx](state['iterate_2'] 
+                state['iterate_2'] = self.prox2[idx](
+                    state['iterate_1'] + self.lr * state['dual'], self.lr)
+                state['dual'].add_(
+                    (state['iterate_1'] - state['iterate_2']) / self.lr)
+                state['iterate_1'] = self.prox1[idx](state['iterate_2']
                                                      - self.lr * (grad + state['dual']), self.lr)
 
                 p.copy_(state['iterate_2'])
@@ -403,12 +416,14 @@ class PairwiseFrankWolfe(Optimizer):
             raise ValueError("lr must be float or 'sublinear'.")
 
         def _lmo(u, x):
-            update_direction, max_step_size = lmo_pairwise(u.unsqueeze(0), x.unsqueeze(0))
+            update_direction, max_step_size = lmo_pairwise(
+                u.unsqueeze(0), x.unsqueeze(0))
             return update_direction.squeeze(dim=0), max_step_size
         self.lmo = _lmo
         self.lr = lr
         self.momentum = momentum
-        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, momentum=self.momentum)
+        defaults = dict(lmo=self.lmo, name=self.name,
+                        lr=self.lr, momentum=self.momentum)
         super(PairwiseFrankWolfe, self).__init__(params, defaults)
 
         raise NotImplementedError
@@ -456,7 +471,8 @@ class FrankWolfe(Optimizer):
                 _lmo = None
             else:
                 def _lmo(u, x):
-                    update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
+                    update_direction, max_step_size = oracle(
+                        u.unsqueeze(0), x.unsqueeze(0))
                     return update_direction.squeeze(dim=0), max_step_size
             lmo_candidates.append(_lmo)
 
@@ -484,9 +500,10 @@ class FrankWolfe(Optimizer):
             raise ValueError("weight_decay should be nonnegative.")
         self.weight_decay = weight_decay
         if normalization not in self.POSSIBLE_NORMALIZATIONS:
-            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}.")
+            raise ValueError(
+                f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}.")
         self.normalization = normalization
-        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr, 
+        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr,
                         momentum=self.momentum,
                         weight_decay=weight_decay,
                         normalization=self.normalization)
@@ -543,13 +560,16 @@ class FrankWolfe(Optimizer):
 
                 state['step'] += 1.
 
-                state['grad_estimate'].add_(grad - state['grad_estimate'], alpha=1. - momentum)
+                state['grad_estimate'].add_(
+                    grad - state['grad_estimate'], alpha=1. - momentum)
                 update_direction, _ = self.lmo[idx](-state['grad_estimate'], p)
-                state['certificate'] = (-state['grad_estimate'] * update_direction).sum()
-                if self.normalization == 'gradient':
+                state['certificate'] = (-state['grad_estimate']
+                                        * update_direction).sum()
+                if group['normalization'] == 'gradient':
                     grad_norm = torch.norm(state['grad_estimate'])
-                    step_size = min(1., step_size * grad_norm / torch.linalg.norm(update_direction))
-                elif self.normalization == 'none':
+                    step_size = min(1., step_size * grad_norm /
+                                    torch.linalg.norm(update_direction))
+                elif group['normalization'] == 'none':
                     pass
                 p.add_(step_size * update_direction)
                 idx += 1
@@ -568,34 +588,40 @@ class SplittingProxFW(Optimizer):
                  lr_prox=.1,
                  momentum=0., weight_decay=0.,
                  normalization='none'):
-
+        params = list(params)
         # initialize proxes
         if prox is None:
-            prox = [None] * len(list(params))
+            prox = [None] * len(params)
 
         prox_candidates = []
-        for prox_el in prox:
-            if prox_el is not None:
-                prox_candidates.append(lambda x, s=None: prox_el(x.unsqueeze(0), s).squeeze(0))
+
+        def prox_maker(oracle):
+            if oracle:
+                def _prox(x, s=None):
+                    return oracle(x.unsqueeze(0), s).squeeze(0)
             else:
-                prox_candidates.append(lambda x, s=None: x)
+                def _prox(x, s=None):
+                    return x, s
+            return _prox
+
+        prox_candidates = [prox_maker(oracle) for oracle in prox]
         # initialize lmos
-        lmo_candidates = []
-        for oracle in lmo:
-            if oracle is None:
-                # Then FW will not be used on this parameter
-                _lmo = None
-            else:
-                def _lmo(u, x):
-                    update_direction, max_step_size = oracle(u.unsqueeze(0), x.unsqueeze(0))
-                    return update_direction.squeeze(dim=0), max_step_size
-            lmo_candidates.append(_lmo)
+
+        def lmo_maker(oracle):
+            def _lmo(u, x):
+                update_direction, max_step_size = oracle(
+                    u.unsqueeze(0), x.unsqueeze(0))
+                return update_direction.squeeze(dim=0), max_step_size.squeeze(dim=0)
+
+            return _lmo
+
+        lmo_candidates = [lmo_maker(oracle) if oracle else None for oracle in lmo]
 
         self.lmo = []
         self.prox = []
         useable_params = []
         for param, lmo_oracle, prox_oracle in zip(params, lmo_candidates, prox_candidates):
-            if lmo_oracle:
+            if lmo_oracle is not None:
                 useable_params.append(param)
                 self.lmo.append(lmo_oracle)
                 self.prox.append(prox_oracle)
@@ -619,7 +645,8 @@ class SplittingProxFW(Optimizer):
         self.weight_decay = weight_decay
 
         if normalization not in self.POSSIBLE_NORMALIZATIONS:
-            raise ValueError(f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
+            raise ValueError(
+                f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
         defaults = dict(lmo=self.lmo, prox=self.prox,
                         name=self.name,
                         momentum=momentum,
@@ -628,7 +655,7 @@ class SplittingProxFW(Optimizer):
                         weight_decay=weight_decay,
                         normalization=normalization)
 
-        super(SplittingProxFW, self).__init__(params, defaults)
+        super(SplittingProxFW, self).__init__(useable_params, defaults)
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -649,7 +676,8 @@ class SplittingProxFW(Optimizer):
                 grad = p.grad
                 state = self.state[p]
                 if grad.is_sparse:
-                    raise RuntimeError("We do not yet support sparse gradients.")
+                    msg = "We do not yet support sparse gradients."
+                    raise RuntimeError(msg)
                 # Keep track of the step
                 grad += .5 * group['weight_decay'] * p
 
@@ -662,24 +690,41 @@ class SplittingProxFW(Optimizer):
                     # initialize grad estimate
                     state['grad_est'] = torch.zeros_like(p)
                     # initialize learning rates
-                    state['lr_prox'] = group['lr_prox'] if type(group['lr_prox'] == float) else 0.
-                    state['lr_lmo'] = group['lr_lmo'] if type(group['lr_lmo'] == float) else 0.
-                    state['momentum'] = group['momentum'] if type(group['momentum'] == float) else 0.
+                    state['lr_prox'] = group['lr_prox'] if type(
+                        group['lr_prox'] == float) else 0.
+                    state['lr_lmo'] = group['lr_lmo'] if type(
+                        group['lr_lmo'] == float) else 0.
+                    state['momentum'] = group['momentum'] if type(
+                        group['momentum'] == float) else 0.
 
                 for lr in ('lr_prox', 'lr_lmo'):
                     if group[lr] == 'sublinear':
                         state[lr] = 2. / (state['step'] + 2)
-                
+
                 if group['momentum'] == 'sublinear':
                     state['momentum'] = 4. / (state['step'] + 8.) ** (2/3)
 
                 state['step'] += 1.
-                state['grad_est'].add_(grad - state['grad_est'], alpha=1. - state['momentum'])
+                state['grad_est'].add_(
+                    grad - state['grad_est'], alpha=1. - state['momentum'])
 
-                y_update, max_step_size = group['lmo'][idx](-state['grad_est'], state['y'])
+                y_update, max_step_size = group['lmo'][idx](
+                    -state['grad_est'], state['y'])
+
+                if group['normalization'] == 'gradient':
+                    grad_norm = torch.norm(state['grad_est'])
+                    for lr, direction in (('lr_prox', state['grad_est']),
+                                          ('lr_lmo', y_update)):
+                        state[lr] = min(max_step_size, group[lr] *
+                                        grad_norm / torch.linalg.norm(direction))
+                elif group['normalization'] == 'none':
+                    for lr in ('lr_prox', 'lr_lmo'):
+                        state[lr] = min(max_step_size, group[lr])
+
                 state['lr_lmo'] = min(state['lr_lmo'], max_step_size)
                 w = y_update + state['y']
-                v = group['prox'][idx](state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], group['lr_prox'])
+                v = group['prox'][idx](
+                    state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], group['lr_prox'])
 
                 state['y'].add_(y_update, alpha=state['lr_lmo'])
                 x_update = v - state['x']

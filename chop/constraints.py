@@ -39,7 +39,7 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
     # Compute average init norms if necessary
     init_norms = dict()
 
-    if ord == 'nuc' and constrain_bias:
+    if (ord == 'nuc') and constrain_bias:
         msg = "'nuc' constraints cannot constrain bias."
         warnings.warn(msg)
         constrain_bias = False
@@ -60,7 +60,8 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
                     init_norms[shape] = avg_norm
 
     for name, param in model.named_parameters():
-        if (not constrain_bias) and ('bias' in name):
+        is_bias = ('bias' in name) or (param.ndim < 2)
+        if is_bias:
             constraint = None
         else:
             print(name)
@@ -71,13 +72,13 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
             else:
                 msg = f"Unknown mode {mode}."
                 raise ValueError(msg)
-        if (type(ord) == int) or (ord == np.inf):
-            constraint = make_LpBall(alpha, p=ord)
-        elif ord == 'nuc':
-            constraint = NuclearNormBall(alpha)
-        else:
-            msg = f"ord {ord} is not supported."
-            raise ValueError(msg)
+            if (type(ord) == int) or (ord == np.inf):
+                constraint = make_LpBall(alpha, p=ord)
+            elif ord == 'nuc':
+                constraint = NuclearNormBall(alpha)
+            else:
+                msg = f"ord {ord} is not supported."
+                raise ValueError(msg)
         constraints.append(constraint)
     return constraints
 
