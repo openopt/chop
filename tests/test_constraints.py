@@ -4,7 +4,9 @@ import numpy as np
 
 import torch
 from torch import nn
+from torchvision import models
 import torch.nn.functional as F
+
 import chop
 from chop import utils
 from chop.utils.image import group_patches
@@ -140,36 +142,38 @@ def test_feasible(Constraint, alpha):
             pass
 
 
-@pytest.mark.parametrize('p', [1, 2, np.inf])
-def test_model_constraint_maker(p):
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.dropout1 = nn.Dropout(0.25)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
 
-    class Net(nn.Module):
-        def __init__(self):
-            super(Net, self).__init__()
-            self.conv1 = nn.Conv2d(1, 32, 3, 1)
-            self.conv2 = nn.Conv2d(32, 64, 3, 1)
-            self.dropout1 = nn.Dropout(0.25)
-            self.dropout2 = nn.Dropout(0.5)
-            self.fc1 = nn.Linear(9216, 128)
-            self.fc2 = nn.Linear(128, 10)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        output = F.log_softmax(x, dim=1)
+        return output
 
-        def forward(self, x):
-            x = self.conv1(x)
-            x = F.relu(x)
-            x = self.conv2(x)
-            x = F.relu(x)
-            x = F.max_pool2d(x, 2)
-            x = self.dropout1(x)
-            x = torch.flatten(x, 1)
-            x = self.fc1(x)
-            x = F.relu(x)
-            x = self.dropout2(x)
-            x = self.fc2(x)
-            output = F.log_softmax(x, dim=1)
-            return output
+
+@pytest.mark.parametrize('ord', [1, 2, np.inf, 'nuc'])
+@pytest.mark.parametrize('constrain_bias', [True, False])
+def test_model_constraint_maker(ord, constrain_bias):
 
     model = Net()
-    constraints = chop.constraints.make_Lp_model_constraints(model, p)
+    constraints = chop.constraints.make_model_constraints(model, ord, constrain_bias=constrain_bias)
 
     assert len(constraints) == len(list(model.parameters()))
 
@@ -182,4 +186,3 @@ def test_model_constraint_maker(p):
             continue
         if constraint:
             assert torch.allclose(param, constraint.prox(param.unsqueeze(0)).squeeze(0), atol=1e-5)
-
