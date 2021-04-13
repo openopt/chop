@@ -9,7 +9,7 @@ See description in :func:`chop.stochastic.SplittingProxFW`.
 
 
 We reproduce the synthetic experimental setting from `[Garber et al. 2018] <https://arxiv.org/pdf/1802.05581.pdf>`_.
-We aim to recover :math:`M = L + S + N`, where :math:`L` is rank :math:`p`,
+We aim to recover :math:`M = L + S + N`, where :math:`L` is rank :math:`r`,
 :math:`S` is :math:`p` sparse, and :math:`N` is standard Gaussian elementwise.
 """
 
@@ -28,11 +28,11 @@ m = 1000
 n = 1000
 
 r_p = [(5, 1e-3),
-    #    (5, 3e-3), (25, 1e-3), (25, 3e-3),
-    #    (25, 3e-2), (130, 1e-2)
+       (5, 3e-3), (25, 1e-3), (25, 3e-3),
+       (25, 3e-2), (130, 1e-2)
        ]
 
-n_epochs = 100
+n_epochs = 400
 
 for r, p in r_p:
     print(f'r={r} and p={p}')
@@ -72,7 +72,8 @@ for r, p in r_p:
     Z.requires_grad_(True)
 
     batch_sizes = [100, 250, 500, 1000]
-    fig, axes = plt.subplots(ncols=len(batch_sizes), figsize=(18, 10))
+    fig, axes = plt.subplots(ncols=len(batch_sizes), figsize=(18, 10), sharey=True)
+    fig.suptitle(f'r={r} and p={p}')
 
     for batch_size, ax in zip(batch_sizes, axes):
         print(f"Batch size: {batch_size}")
@@ -80,12 +81,14 @@ for r, p in r_p:
                                                 batch_size=batch_size,
                                                 drop_last=True)
 
+        momentum = .9 if batch_size != 1000 else 0.
+
         optimizer = chop.stochastic.SplittingProxFW([Z], lmo=[lmo], prox=[prox],
                                                     lr_lmo='sublinear',
                                                     lr_prox='sublinear',
                                                     normalization='none',
                                                     # weight_decay=1e-8,
-                                                    momentum=.9)
+                                                    momentum=momentum)
 
         train_losses = []
         losses = []
@@ -108,6 +111,7 @@ for r, p in r_p:
         ax.set_title(f"b={batch_size}")
         ax.plot(train_losses, label='training_losses')
         ax.plot(losses, label='loss')
-        ax.set_ylim(0, 250)
+        ax.set_yscale('log')
         ax.legend()
-    print("Done.")
+    fig.show()
+print("Done.")
