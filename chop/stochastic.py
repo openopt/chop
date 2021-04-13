@@ -142,7 +142,7 @@ class PGD(Optimizer):
                 self.prox.append(lambda x, s=None: x)
 
         if not (type(lr) == float or lr == 'sublinear'):
-            raise ValueError("lr must be float or 'sublinear'.")
+            raise ValueError(f"lr must be float or 'sublinear', got {lr}.")
         self.lr = lr
 
         if not(0. <= momentum <= 1.):
@@ -405,6 +405,7 @@ class S3CM(Optimizer):
 
                 p.copy_(state['iterate_2'])
                 idx += 1
+        return loss
 
 
 class PairwiseFrankWolfe(Optimizer):
