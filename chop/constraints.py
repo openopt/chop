@@ -21,12 +21,13 @@ from chop import utils
 
 
 @torch.no_grad()
-def get_avg_init_norm(layer, param_type=None, p=2, repetitions=100):
+def get_avg_init_norm(layer, param_type=None, ord=2, repetitions=100):
     """Computes the average norm of default layer initialization"""
     output = 0
     for _ in range(repetitions):
         layer.reset_parameters()
-        output += torch.norm(getattr(layer, param_type), p=p).item()
+        warnings.warn("torch.norm is deprecated. Think about updating this.")
+        output += torch.norm(getattr(layer, param_type), p=ord).item()
     return float(output) / repetitions
 
 
@@ -56,8 +57,8 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
                             None))]:
                     param = getattr(layer, param_type)
                     shape = param.shape
-
-                    avg_norm = get_avg_init_norm(layer, param_type=param_type, p=2)
+                    # TODO: figure out how to set the constraint size for NuclearNormBall constraint
+                    avg_norm = get_avg_init_norm(layer, param_type=param_type, ord=2)
                     if avg_norm == 0.0:
                         # Catch unlikely case that weight/bias is 0-initialized (e.g. BatchNorm does this)
                         avg_norm = 1.0
@@ -449,7 +450,9 @@ class Simplex:
     @torch.no_grad()
     def prox(self, x, step_size=None):
         shape = x.shape
-        x = euclidean_proj_simplex(x.view(-1), self.alpha)
+        flattened_x = x.view(shape[0], -1)
+        projected = [euclidean_proj_simplex(row, s=self.alpha) for row in flattened_x]
+        x = torch.stack(projected)
         return x.view(*shape)
 
     @torch.no_grad()
@@ -508,15 +511,18 @@ class NuclearNormBall:
         """
         Projection operator on the Nuclear Norm constraint set.
         """
-
         U, S, V = torch.svd(x)
-        # Project S on the alpha-simplex
-        simplex = Simplex(self.alpha)
+        # Project S on the alpha-L1 ball
+        ball = L1Ball(self.alpha)
 
-        S_proj = simplex.prox(S.view(-1, S.size(-1))).view_as(S)
-        
+        S_proj = ball.prox(S.view(-1, S.size(-1))).view_as(S)
+
         VT = V.transpose(-2, -1)
         return torch.matmul(U, torch.matmul(torch.diag_embed(S_proj), VT))
+
+    def is_feasible(self, x, atol=1e-5, rtol=1e-5):
+        norms = torch.linalg.norm(x, dim=(-2, -1), ord='nuc')
+        return (norms <= self.alpha * (1. + rtol) + atol)
 
 
 class GroupL1Ball:
