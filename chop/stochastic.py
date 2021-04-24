@@ -553,7 +553,7 @@ class FrankWolfe(Optimizer):
                 else:
                     raise ValueError("lr must be float or 'sublinear'.")
 
-                if self.momentum is None:
+                if self.momentum is None or self.momentum == 'sublinear':
                     rho = (1. / (state['step'] + 1)) ** (1/3)
                     momentum = 1. - rho
                 else:
@@ -680,7 +680,7 @@ class SplittingProxFW(Optimizer):
                     msg = "We do not yet support sparse gradients."
                     raise RuntimeError(msg)
                 # Keep track of the step
-                grad += .5 * group['weight_decay'] * p
+                grad += group['weight_decay'] * p
 
                 # Initialization
                 if len(state) == 0:
@@ -703,7 +703,8 @@ class SplittingProxFW(Optimizer):
                         state[lr] = 2. / (state['step'] + 2)
 
                 if group['momentum'] == 'sublinear':
-                    state['momentum'] = 4. / (state['step'] + 8.) ** (2/3)
+                    rho = 4. / (state['step'] + 8.) ** (2/3)
+                    state['momentum'] = 1. - rho
 
                 state['step'] += 1.
                 state['grad_est'].add_(
@@ -712,23 +713,19 @@ class SplittingProxFW(Optimizer):
                 y_update, max_step_size = group['lmo'][idx](
                     -state['grad_est'], state['y'])
 
-                if group['normalization'] == 'gradient':
-                    grad_norm = torch.norm(state['grad_est'])
-                    for lr, direction in (('lr_prox', state['grad_est']),
-                                          ('lr_lmo', y_update)):
-                        state[lr] = min(max_step_size, state[lr] *
-                                        grad_norm / torch.linalg.norm(direction))
-                elif group['normalization'] == 'none':
-                    for lr in ('lr_prox', 'lr_lmo'):
-                        state[lr] = min(max_step_size, state[lr])
+                state['lr_lmo'] = min(max_step_size, state['lr_lmo'])
 
+                if group['normalization'] == 'gradient':
+                    # Normalize LMO update direction
+                    grad_norm = torch.linalg.norm(state['grad_est'])
+                    y_update *= min(1, grad_norm / torch.linalg.norm(y_update))
                 state['lr_lmo'] = min(state['lr_lmo'], max_step_size)
                 w = y_update + state['y']
                 v = group['prox'][idx](
-                    state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], group['lr_prox'])
+                    state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], state['lr_prox'])
+                x_update = v - state['x']
 
                 state['y'].add_(y_update, alpha=state['lr_lmo'])
-                x_update = v - state['x']
                 state['x'].add_(x_update, alpha=state['lr_lmo'])
 
                 p.copy_(state['x'] + state['y'])
