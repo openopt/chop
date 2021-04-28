@@ -585,7 +585,7 @@ class SplittingProxFW(Optimizer):
     POSSIBLE_NORMALIZATIONS = {'none', 'gradient'}
 
     def __init__(self, params, lmo, prox=None,
-                 lr_lmo=.1,
+                 lr=.1,
                  lr_prox=.1,
                  momentum=0., weight_decay=0.,
                  normalization='none'):
@@ -632,7 +632,7 @@ class SplittingProxFW(Optimizer):
                        f"Please pass this parameter to another optimizer.")
                 warnings.warn(msg)
 
-        for name, lr in (('lr_lmo', lr_lmo),
+        for name, lr in (('lr', lr),
                          ('lr_prox', lr_prox)):
             if not ((type(lr) == float) or lr == 'sublinear'):
                 msg = f"{name} should be a float or 'sublinear', got {lr}."
@@ -651,7 +651,7 @@ class SplittingProxFW(Optimizer):
         defaults = dict(lmo=self.lmo, prox=self.prox,
                         name=self.name,
                         momentum=momentum,
-                        lr_lmo=lr_lmo,
+                        lr=lr,
                         lr_prox=lr_prox,
                         weight_decay=weight_decay,
                         normalization=normalization)
@@ -685,20 +685,22 @@ class SplittingProxFW(Optimizer):
                 # Initialization
                 if len(state) == 0:
                     state['step'] = 0.
-                    # split variable: p = x + y
-                    state['x'] = .5 * p.detach().clone()
-                    state['y'] = .5 * p.detach().clone()
+                    state['prox'] = group['prox'][idx]
+                    state['lmo'] = group['lmo'][idx]
+                    # split variable: p = x + y and make feasible
+                    state['x'] = state['prox'](.5 * p.detach().clone())
+                    state['y'] = state['prox'](.5 * p.detach().clone())
                     # initialize grad estimate
                     state['grad_est'] = torch.zeros_like(p)
                     # initialize learning rates
                     state['lr_prox'] = group['lr_prox'] if type(
                         group['lr_prox'] == float) else 0.
-                    state['lr_lmo'] = group['lr_lmo'] if type(
-                        group['lr_lmo'] == float) else 0.
+                    state['lr'] = group['lr'] if type(
+                        group['lr'] == float) else 0.
                     state['momentum'] = group['momentum'] if type(
                         group['momentum'] == float) else 0.
 
-                for lr in ('lr_prox', 'lr_lmo'):
+                for lr in ('lr_prox', 'lr'):
                     if group[lr] == 'sublinear':
                         state[lr] = 2. / (state['step'] + 2)
 
@@ -710,23 +712,24 @@ class SplittingProxFW(Optimizer):
                 state['grad_est'].add_(
                     grad - state['grad_est'], alpha=1. - state['momentum'])
 
-                y_update, max_step_size = group['lmo'][idx](
+                y_update, max_step_size = state['lmo'](
                     -state['grad_est'], state['y'])
 
-                state['lr_lmo'] = min(max_step_size, state['lr_lmo'])
+                state['lr'] = min(max_step_size, state['lr'])
 
                 if group['normalization'] == 'gradient':
                     # Normalize LMO update direction
                     grad_norm = torch.linalg.norm(state['grad_est'])
-                    y_update *= min(1, grad_norm / torch.linalg.norm(y_update))
-                state['lr_lmo'] = min(state['lr_lmo'], max_step_size)
+                    y_update_norm = torch.linalg.norm(y_update)
+                    y_update *= min(1, grad_norm / y_update_norm)
+
                 w = y_update + state['y']
-                v = group['prox'][idx](
+                v = state['prox'](
                     state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], state['lr_prox'])
                 x_update = v - state['x']
 
-                state['y'].add_(y_update, alpha=state['lr_lmo'])
-                state['x'].add_(x_update, alpha=state['lr_lmo'])
+                state['y'].add_(y_update, alpha=state['lr'])
+                state['x'].add_(x_update, alpha=state['lr'])
 
                 p.copy_(state['x'] + state['y'])
                 idx += 1
