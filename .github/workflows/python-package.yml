@@ -1,0 +1,76 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Python package
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+
+    steps:
+    - name: Checking out code
+      uses: actions/checkout@v2
+    - name: Cache conda
+      uses: actions/cache@v2
+      env:
+        # Increase this value to reset cache if etc/example-environment.yml has not changed
+        CACHE_NUMBER: 0
+      with:
+        path: ~/conda_pkgs_dir
+        key:
+          ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
+          hashFiles('environment.yml') }}
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Installing environment and dependencies
+      run: |
+        $CONDA/bin/conda env update --file environment.yml --name base
+    - name: Install package
+      run: |
+        sudo python setup.py develop
+    - name: Dependencies needed for coverage and unit tests
+      run: |
+        $CONDA/bin/pip install matplotlib
+        $CONDA/bin/pip install tqdm
+        $CONDA/bin/pip install tensorboardX cox requests
+        $CONDA/bin/pip install advertorch copt
+        $CONDA/bin/pip install git+https://github.com/RobustBench/robustbench
+        $CONDA/bin/pip install coveralls coverage pytest-cov
+    - name: Dependencies needed for sphinx
+      run: |
+        $CONDA/bin/pip install sphinx sphinx-gallery
+        $CONDA/bin/pip install memory_profiler
+    - name: Running unit tests
+      run: |
+        $CONDA/bin/pytest -v --cov=chop
+    - name: Building the documentation
+      working-directory: doc/
+      run: |
+        $CONDA/bin/sphinx-build -M html "." "_build" 
+    - name: Uploading docs to gcs
+      uses: actions-hub/gcloud@master
+      env:
+        PROJECT_ID: test # This is a placeholder value that is only needed for the action to succeed, it's not an optional parameter
+        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+      with:
+        args: -m doc/rsync -r _build/html gs://openo.pt/chop
+        cli: gsutil
+        
+
+    # - name: Publishing coveralls
+    #   uses: coverallsapp/github-action@master
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
+
