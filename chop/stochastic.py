@@ -586,7 +586,7 @@ class SplittingProxFW(Optimizer):
 
     def __init__(self, params, lmo, prox=None,
                  lr=.1,
-                 lr_prox=.1,
+                 lipschitz                                                                                                                                            =1.,
                  momentum=0., weight_decay=0.,
                  normalization='none'):
         params = list(params)
@@ -598,7 +598,7 @@ class SplittingProxFW(Optimizer):
 
         def prox_maker(oracle):
             if oracle:
-                def _prox(x, s=None):
+                def _prox(x, s=None):                           
                     return oracle(x.unsqueeze(0), s).squeeze(0)
             else:
                 def _prox(x, s=None):
@@ -652,7 +652,7 @@ class SplittingProxFW(Optimizer):
                         name=self.name,
                         momentum=momentum,
                         lr=lr,
-                        lr_prox=lr_prox,
+                        lipschitz=lipschitz,
                         weight_decay=weight_decay,
                         normalization=normalization)
 
@@ -693,16 +693,15 @@ class SplittingProxFW(Optimizer):
                     # initialize grad estimate
                     state['grad_est'] = torch.zeros_like(p)
                     # initialize learning rates
-                    state['lr_prox'] = group['lr_prox'] if type(
-                        group['lr_prox'] == float) else 0.
                     state['lr'] = group['lr'] if type(
                         group['lr'] == float) else 0.
+                    state['lipschitz'] = group['lipschitz']
+                    state['lr_prox'] = state['lr'] * state['lipschitz']
                     state['momentum'] = group['momentum'] if type(
                         group['momentum'] == float) else 0.
 
-                for lr in ('lr_prox', 'lr'):
-                    if group[lr] == 'sublinear':
-                        state[lr] = 2. / (state['step'] + 2)
+                if group['lr'] == 'sublinear':
+                    state['lr'] = 2. / (state['step'] + 2)
 
                 if group['momentum'] == 'sublinear':
                     rho = 4. / (state['step'] + 8.) ** (2/3)
@@ -715,6 +714,7 @@ class SplittingProxFW(Optimizer):
                 y_update, max_step_size = state['lmo'](
                     -state['grad_est'], state['y'])
 
+                state['lr_prox'] = state['lr'] * state['lipschitz']
                 state['lr'] = min(max_step_size, state['lr'])
 
                 if group['normalization'] == 'gradient':
