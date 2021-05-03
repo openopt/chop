@@ -586,7 +586,7 @@ class SplittingProxFW(Optimizer):
 
     def __init__(self, params, lmo, prox=None,
                  lr=.1,
-                 lipschitz                                                                                                                                            =1.,
+                 lipschitz=1.,
                  momentum=0., weight_decay=0.,
                  normalization='none'):
         params = list(params)
@@ -632,11 +632,9 @@ class SplittingProxFW(Optimizer):
                        f"Please pass this parameter to another optimizer.")
                 warnings.warn(msg)
 
-        for name, lr in (('lr', lr),
-                         ('lr_prox', lr_prox)):
-            if not ((type(lr) == float) or lr == 'sublinear'):
-                msg = f"{name} should be a float or 'sublinear', got {lr}."
-                raise ValueError(msg)
+        if not ((type(lr) == float) or lr == 'sublinear'):
+            msg = f"lr should be a float or 'sublinear', got {lr}."
+            raise ValueError(msg)
 
         if (momentum != 'sublinear') and (not (0. <= momentum <= 1.)):
             raise ValueError("momentum must be in [0., 1.] or 'sublinear'.")
