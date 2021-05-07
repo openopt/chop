@@ -611,10 +611,14 @@ class SplittingProxFW(Optimizer):
         parameters to optimize
     
       lmo: [callable or None]
-        LMO oracles corresponding to each parameter in params
+        LMO oracles corresponding to each parameter in params. Applies to the y variable.
 
-      prox: [callable or None] or None
-        prox oracles corresponding to each parameter in params
+      prox1: [callable or None] or None
+        prox oracles corresponding to each parameter in params. This one is for the x variable.
+
+      prox2: [callable or None] or None
+        prox oracles corresponding to each parameter in params.
+        Only used for initializing y to be feasible.
 
       lr: float
         learning rate
@@ -638,7 +642,7 @@ class SplittingProxFW(Optimizer):
 
     POSSIBLE_NORMALIZATIONS = {'none', 'gradient'}
 
-    def __init__(self, params, lmo, prox=None,
+    def __init__(self, params, lmo, prox1=None, prox2=None,
                  lr=.1,
                  lipschitz=1.,
                  momentum=0., weight_decay=0.,
@@ -646,23 +650,26 @@ class SplittingProxFW(Optimizer):
         params = list(params)
 
         # initialize proxes
-        if prox is None:
-            prox = [None] * len(params)
-        prox_candidates = [Prox(oracle) for oracle in prox]
+        if prox1 is None:
+            prox1 = [None] * len(params)
+        prox_candidates = [Prox(oracle) for oracle in prox1]
 
         # initialize lmos
         lmo_candidates = [LMO(oracle) if oracle else None for oracle in lmo]
+        prox_y = [Prox(oracle) for oracle in prox2]
 
         lmos = []
         proxes = []
         useable_params = []
-        for param, lmo_oracle, prox_oracle in zip(params, lmo_candidates, prox_candidates):
+        proxes_y = []
+        for k, (param, lmo_oracle, prox_oracle, prox_y_oracle) in enumerate(zip(params, lmo_candidates, prox_candidates, prox_y)):
             if lmo_oracle is not None:
                 useable_params.append(param)
                 lmos.append(lmo_oracle)
                 proxes.append(prox_oracle)
+                proxes_y.append(prox_y_oracle)
             else:
-                msg = (f"No LMO was provided for parameter {param}. "
+                msg = (f"No LMO was provided for parameter {k}. "
                        f"This optimizer will not optimize this parameter. "
                        f"Please pass this parameter to another optimizer.")
                 warnings.warn(msg)
@@ -682,6 +689,7 @@ class SplittingProxFW(Optimizer):
             raise ValueError(
                 f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
         defaults = dict(lmo=lmos, prox=proxes,
+                        prox_y=proxes_y,
                         name=self.name,
                         momentum=momentum,
                         lr=lr,
@@ -719,16 +727,17 @@ class SplittingProxFW(Optimizer):
                 if len(state) == 0:
                     state['step'] = 0.
                     state['prox'] = group['prox'][idx]
+                    state['prox_y'] = group['prox_y'][idx]
                     state['lmo'] = group['lmo'][idx]
                     # split variable: p = x + y and make feasible
                     state['x'] = state['prox'](.5 * p.detach().clone())
-                    state['y'] = state['prox'](.5 * p.detach().clone())
+                    state['y'] = state['prox_y'](.5 * p.detach().clone())
                     # initialize grad estimate
                     state['grad_est'] = torch.zeros_like(p)
 
                 # set learning rates
                 state['lr'] = group['lr'] if type(
-                    group['lr'] == float) else None 
+                    group['lr'] == float) else None
                 state['lipschitz'] = group['lipschitz']
                 state['lr_prox'] = state['lr'] * state['lipschitz']
                 state['momentum'] = group['momentum'] if type(
