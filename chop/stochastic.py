@@ -12,11 +12,36 @@ The API in this module is inspired by torch.optim.
 import warnings
 
 import torch
+from torch import nn
 from torch.optim import Optimizer
 import numpy as np
 
 
 EPS = np.finfo(np.float32).eps
+
+
+class Prox(nn.Module):
+    def __init__(self, prox_fun=None):
+        super().__init__()
+        self.prox_fun = prox_fun
+
+    def forward(self, x, s=None):
+        if self.prox_fun is not None:
+            return self.prox_fun(x.unsqueeze(0)).squeeze(0)
+        else:
+            return x
+
+
+class LMO(nn.Module):
+    def __init__(self, lmo_fun):
+        super().__init__()
+        self.lmo_fun = lmo_fun
+
+    def forward(self, u, x):
+        update_direction, max_step_size = self.lmo_fun(
+            u.unsqueeze(0), x.unsqueeze(0))
+        return update_direction.squeeze(dim=0), max_step_size.squeeze(dim=0)
+
 
 
 def backtracking_step_size(
@@ -578,7 +603,36 @@ class FrankWolfe(Optimizer):
 
 
 class SplittingProxFW(Optimizer):
-    # TODO: write docstring!
+    """
+    Stochastic splitting optimization algorithm, using a prox and a LMO primitive.
+
+    Args:
+      params:
+        parameters to optimize
+    
+      lmo: [callable or None]
+        LMO oracles corresponding to each parameter in params
+
+      prox: [callable or None] or None
+        prox oracles corresponding to each parameter in params
+
+      lr: float
+        learning rate
+    
+      lipschitz: float
+        estimate of the Lipschitz constant of the objective
+
+      momentum: float in [0., 1.]
+        momentum to apply in the stochastic gradient estimator
+
+      weigth_decay: float > 0
+        scale of L2 penalty
+    
+      normalization: str
+        One of {'gradient', 'none'}. Default: 'none'.
+        If using 'gradient', normalizes the update_direction to have the same magnitude as the gradient,
+        for the LMO part.
+    """
 
     name = 'Hybrid Prox FW Splitting'
 
@@ -590,42 +644,23 @@ class SplittingProxFW(Optimizer):
                  momentum=0., weight_decay=0.,
                  normalization='none'):
         params = list(params)
+
         # initialize proxes
         if prox is None:
             prox = [None] * len(params)
+        prox_candidates = [Prox(oracle) for oracle in prox]
 
-        prox_candidates = []
-
-        def prox_maker(oracle):
-            if oracle:
-                def _prox(x, s=None):                           
-                    return oracle(x.unsqueeze(0), s).squeeze(0)
-            else:
-                def _prox(x, s=None):
-                    return x, s
-            return _prox
-
-        prox_candidates = [prox_maker(oracle) for oracle in prox]
         # initialize lmos
+        lmo_candidates = [LMO(oracle) if oracle else None for oracle in lmo]
 
-        def lmo_maker(oracle):
-            def _lmo(u, x):
-                update_direction, max_step_size = oracle(
-                    u.unsqueeze(0), x.unsqueeze(0))
-                return update_direction.squeeze(dim=0), max_step_size.squeeze(dim=0)
-
-            return _lmo
-
-        lmo_candidates = [lmo_maker(oracle) if oracle else None for oracle in lmo]
-
-        self.lmo = []
-        self.prox = []
+        lmos = []
+        proxes = []
         useable_params = []
         for param, lmo_oracle, prox_oracle in zip(params, lmo_candidates, prox_candidates):
             if lmo_oracle is not None:
                 useable_params.append(param)
-                self.lmo.append(lmo_oracle)
-                self.prox.append(prox_oracle)
+                lmos.append(lmo_oracle)
+                proxes.append(prox_oracle)
             else:
                 msg = (f"No LMO was provided for parameter {param}. "
                        f"This optimizer will not optimize this parameter. "
@@ -646,7 +681,7 @@ class SplittingProxFW(Optimizer):
         if normalization not in self.POSSIBLE_NORMALIZATIONS:
             raise ValueError(
                 f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}")
-        defaults = dict(lmo=self.lmo, prox=self.prox,
+        defaults = dict(lmo=lmos, prox=proxes,
                         name=self.name,
                         momentum=momentum,
                         lr=lr,
