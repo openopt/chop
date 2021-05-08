@@ -735,16 +735,16 @@ class SplittingProxFW(Optimizer):
                     # initialize grad estimate
                     state['grad_est'] = torch.zeros_like(p)
 
-                # set learning rates
-                state['lr'] = group['lr'] if type(
-                    group['lr'] == float) else None
+                # set state parameters
                 state['lipschitz'] = group['lipschitz']
-                state['lr_prox'] = state['lr'] * state['lipschitz']
                 state['momentum'] = group['momentum'] if type(
                     group['momentum'] == float) else 0.
 
                 if group['lr'] == 'sublinear':
                     state['lr'] = 2. / (state['step'] + 2)
+
+                elif type(group['lr']) == float:
+                    state['lr'] = group['lr']
 
                 if group['momentum'] == 'sublinear':
                     rho = 4. / (state['step'] + 8.) ** (2/3)
