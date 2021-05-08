@@ -19,6 +19,8 @@ import torch
 import chop
 from chop import utils
 from chop.utils.logging import Trace
+from time import time
+
 
 torch.manual_seed(0)
 
@@ -67,15 +69,16 @@ for r, p in r_p:
 
     lmo = rank_constraint.lmo
     prox = sparsity_constraint.prox
+    prox_lr = rank_constraint.prox
 
     Z = torch.zeros_like(M, device=device)
     Z.requires_grad_(True)
 
     batch_sizes = [100, 250, 500, 1000]
-    fig, axes = plt.subplots(ncols=len(batch_sizes), figsize=(18, 10), sharey=True)
+    fig, axes = plt.subplots(nrows=2, ncols=len(batch_sizes), figsize=(18, 10), sharey=True)
     fig.suptitle(f'r={r} and p={p}')
 
-    for batch_size, ax in zip(batch_sizes, axes):
+    for batch_size, ax_it, ax_time in zip(batch_sizes, axes[0], axes[1]):
         print(f"Batch size: {batch_size}")
         sampler = torch.utils.data.BatchSampler(torch.utils.data.RandomSampler(range(M.size(0))),
                                                 batch_size=batch_size,
@@ -83,35 +86,55 @@ for r, p in r_p:
 
         momentum = .9 if batch_size != 1000 else 0.
 
-        optimizer = chop.stochastic.SplittingProxFW([Z], lmo=[lmo], prox=[prox],
-                                                    lr_lmo='sublinear',
-                                                    lr_prox='sublinear',
+        optimizer = chop.stochastic.SplittingProxFW([Z], lmo=[lmo],
+                                                    prox1=[prox],
+                                                    prox2=[prox_lr],
+                                                    lr='sublinear',
+                                                    lipschitz=1.,
                                                     normalization='none',
-                                                    # weight_decay=1e-8,
                                                     momentum=momentum)
 
         train_losses = []
+        start = time()
+        times = []
         losses = []
         sgrad_avg = 0
         n_it = 0
+        freq = 10
         for it in range(n_epochs):
             for idx in sampler:
                 n_it += 1
                 optimizer.zero_grad()
                 loss = sqloss(Z[idx], M[idx])
-                train_losses.append(loss.item())
                 loss.backward()
                 sgrad = Z.grad.detach().clone()
                 sgrad_avg += sgrad
                 # for logging
-                with torch.no_grad():
-                    full_loss = sqloss(Z, M)
-                    losses.append(full_loss.item())
+                if n_it % freq == 0:
+                    with torch.no_grad():
+                        times.append(time() - start)
+                        full_loss = sqloss(Z, M)
+                        train_losses.append(loss.item())
+                        losses.append(full_loss.item())
                 optimizer.step()
-        ax.set_title(f"b={batch_size}")
-        ax.plot(train_losses, label='training_losses')
-        ax.plot(losses, label='loss')
-        ax.set_yscale('log')
-        ax.legend()
+
+        # Get sparse and LR component
+        state = optimizer.state[Z]
+        sparse_comp = state['x']
+        lr_comp = state['y']
+
+        # Plots
+        ax_it.set_title(f"b={batch_size}")
+        ax_it.plot(train_losses, label='mini-batch loss')
+        ax_it.plot(losses, label='full loss')
+        ax_it.set_xlabel('iterations')
+        ax_time.plot(times, train_losses, label='minibatch loss')
+        ax_time.plot(times, losses, label='full loss')
+        ax_time.set_xlabel('time (s)')
+        ax_it.set_yscale('log')
+        ax_it.legend()
+
     fig.show()
+    fig.savefig("robustPCA.png")
+    break
 print("Done.")
