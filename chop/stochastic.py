@@ -652,6 +652,8 @@ class SplittingProxFW(Optimizer):
         # initialize proxes
         if prox1 is None:
             prox1 = [None] * len(params)
+        if prox2 is None:
+            prox2 = [None] * len(params)
         prox_candidates = [Prox(oracle) for oracle in prox1]
 
         # initialize lmos
