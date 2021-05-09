@@ -181,8 +181,9 @@ def test_model_constraint_maker(ord, constrain_bias):
 
     chop.constraints.make_feasible(model, proxes)
 
-    for (name, param), constraint in zip(model.named_parameters(), constraints):
+    for (name, param), prox in zip(model.named_parameters(), proxes):
         if chop.constraints.is_bias(name, param) and ord == 'nuc':
             continue
-        if constraint:
-            assert torch.allclose(param, constraint.prox(param.unsqueeze(0)).squeeze(0), atol=1e-5)
+        if prox:
+            allclose = torch.allclose(param, prox(param.unsqueeze(0)).squeeze(0), rtol=5e-3, atol=5e-3)
+            assert allclose

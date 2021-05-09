@@ -60,9 +60,8 @@ bias_params = [param for name, param in model.named_parameters() if 'bias' in na
 bias_opt = chop.stochastic.PGD(bias_params, lr=1e-1)
 bias_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(bias_opt)
 
-print("Training...")
-# Training loop
-for epoch in range(nb_epochs):
+
+def train():
     model.train()
     train_loss = 0.
     for data, target in tqdm(loaders.train, desc=f'Training epoch {epoch}/{nb_epochs - 1}'):
@@ -78,9 +77,10 @@ for epoch in range(nb_epochs):
         train_loss += loss.item()
     train_loss /= len(loaders.train)
     print(f'Training loss: {train_loss:.3f}')
+    return train_loss
 
-    # Evaluate on clean and adversarial test data
 
+def eval():
     model.eval()
     report = EasyDict(nb_test=0, correct=0, correct_adv_pgd=0,
                       correct_adv_pgd_madry=0,
@@ -90,7 +90,7 @@ for epoch in range(nb_epochs):
         for data, target in tqdm(loaders.test, desc=f'Val epoch {epoch}/{nb_epochs - 1}'):
             data, target = data.to(device), target.to(device)
 
-            # Compute corresponding predictions        
+            # Compute corresponding predictions
             logits = model(data)
             _, pred = logits.max(1)
             val_loss += criterion(logits, target)
@@ -100,6 +100,14 @@ for epoch in range(nb_epochs):
 
     val_loss /= report.nb_test
     print(f'Val acc on clean examples (%): {report.correct / report.nb_test * 100.:.3f}')
+    return val_loss
 
+
+print("Training...")
+# Training loop
+for epoch in range(nb_epochs):
+    # Evaluate on clean and adversarial test data
+    train()
+    val_loss = eval()
     scheduler.step(val_loss)
     bias_scheduler.step(val_loss)

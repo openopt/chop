@@ -506,27 +506,25 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, lipschitz
     # TODO: add error catching for L0
     Lt = lipschitz
 
+    x.requires_grad_(True)
+    y.requires_grad_(True)
+
+    fval, grad = closure(x + y)
+
     for it in range(max_iter):
 
         if step == 'sublinear':
             step_size = 2. / (it + 2) * torch.ones(batch_size, device=x.device)
 
-        x.requires_grad_(True)
-        y.requires_grad_(True)
-        z = x + y
-
-        f_val, grad = closure(z)
-
         # estimate Lipschitz constant with backtracking line search
-        Lt = utils.init_lipschitz(closure, z, L0=Lt)
+        Lt = utils.init_lipschitz(closure, x + y, L0=Lt)
 
-        y_update, max_step_size = lmo(-grad, y)
         with torch.no_grad():
+            y_update, max_step_size = lmo(-grad, y)
             w = y_update + y
-        prox_step_size = utils.bmul(step_size, Lt)
-        v = prox(z - w - utils.bdiv(grad, prox_step_size), prox_step_size)
+            prox_step_size = utils.bmul(step_size, Lt)
+            v = prox(x + y - w - utils.bdiv(grad, prox_step_size), prox_step_size)
 
-        with torch.no_grad():
             if line_search is None:
                 step_size = torch.min(step_size, max_step_size)
             else:
@@ -540,7 +538,10 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, lipschitz
             if callback(locals()) is False:
                 break
 
-    fval, grad = closure(x + y)
+        x.requires_grad_(True)
+        y.requires_grad_(True)
+
+        fval, grad = closure(x + y)
     # TODO: add a certificate of optimality
     result = optimize.OptimizeResult(x=x, y=y, nit=it, fval=fval, grad=grad, certificate=None)
     return result
