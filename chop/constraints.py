@@ -158,13 +158,13 @@ def euclidean_proj_l1ball(v, s=1.):
       
   Args:
   
-    v: (n,) numpy array,
+    v: (n,) torch tensor,
       n-dimensional vector to project
     s: float, optional, default: 1,
       radius of the L1-ball
       
   Returns:
-    w: (n,) numpy array,
+    w: (n,) torch tensor,
       Euclidean projection of v on the L1-ball of radius s
   Notes
   -----
@@ -173,9 +173,11 @@ def euclidean_proj_l1ball(v, s=1.):
   --------
   euclidean_proj_simplex
   """
-    assert s > 0, "Radius s must be strictly positive (%d <= 0)" % s
+    assert s >= 0, "Radius s must be strictly positive (%d <= 0)" % s
     if len(v.shape) > 1:
         raise ValueError
+    if s == 0:
+        return torch.zeros_like(v)
     # compute the vector of absolute values
     u = abs(v)
     # check if v is already a solution
