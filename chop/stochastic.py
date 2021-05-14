@@ -646,7 +646,7 @@ class SplittingProxFW(Optimizer):
                  lr=.1,
                  lipschitz=1.,
                  momentum=0., weight_decay=0.,
-                 normalization='none'):
+                 normalization='none', generalized_lmo=False):
         params = list(params)
 
         # initialize proxes
@@ -697,7 +697,8 @@ class SplittingProxFW(Optimizer):
                         lr=lr,
                         lipschitz=lipschitz,
                         weight_decay=weight_decay,
-                        normalization=normalization)
+                        normalization=normalization,
+                        generalized_lmo=generalized_lmo)
 
         super(SplittingProxFW, self).__init__(useable_params, defaults)
 
@@ -756,8 +757,15 @@ class SplittingProxFW(Optimizer):
                 state['grad_est'].add_(
                     grad - state['grad_est'], alpha=1. - state['momentum'])
 
-                y_update, max_step_size = state['lmo'](
-                    -state['grad_est'], state['y'])
+                if group['generalized_lmo']:
+                    y_update, max_step_size = state['lmo'](
+                        -state['grad_est'], state['y'],
+                        {'lipschitz': state['lipschitz'],
+                         'step_size': state['lr']}
+                    )
+                else:
+                    y_update, max_step_size = state['lmo'](
+                        -state['grad_est'], state['y'])
 
                 state['lr_prox'] = state['lr'] * state['lipschitz']
                 state['lr'] = min(max_step_size, state['lr'])

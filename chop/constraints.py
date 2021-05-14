@@ -274,7 +274,7 @@ class LinfBall(LpBall):
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """Linear Maximization Oracle.
         Return s - iterate with s solving the linear problem
 
@@ -323,7 +323,7 @@ class L1Ball(LpBall):
     p = 1
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """Linear Maximization Oracle.
         Return s - iterate with s solving the linear problem
 
@@ -402,7 +402,7 @@ class L2Ball(LpBall):
 
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """Linear Maximization Oracle.
         Return s - iterate with s solving the linear problem
 
@@ -458,7 +458,7 @@ class Simplex:
         return x.view(*shape)
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         batch_size = grad.size(0)
         shape = iterate.shape
         max_vals, max_idx = grad.reshape(batch_size, -1).max(-1)
@@ -488,7 +488,7 @@ class NuclearNormBall:
         self.alpha = alpha
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """
         Computes the LMO for the Nuclear Norm Ball on the last two dimensions.
         Returns :math: `s - $iterate$` where
@@ -504,8 +504,8 @@ class NuclearNormBall:
         """
         update_direction = -iterate.clone().detach()
         u, _, v = utils.power_iteration(grad)
-        outer = u.unsqueeze(-1) * v.unsqueeze(-2)
-        update_direction += self.alpha * outer
+        atom = u.unsqueeze(-1) * v.unsqueeze(-2)
+        update_direction += self.alpha * atom
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
@@ -558,7 +558,7 @@ class GroupL1Ball:
         return group_norms
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         update_direction = -iterate.detach().clone()
         # find group with largest L2 norm
         group_norms = self.get_group_norms(grad)
