@@ -111,7 +111,6 @@ for r, p in r_p:
                     with torch.no_grad():
                         times.append(time() - start)
                         full_loss = sqloss(Z, M)
-                        print(full_loss)
                         train_losses.append(loss.item())
                         losses.append(full_loss.item())
                 optimizer.step()
@@ -137,5 +136,4 @@ for r, p in r_p:
         print(f"Reconstruction loss: {torch.linalg.norm(M - sparse_comp - lr_comp) / torch.linalg.norm(M)}")
         print(f"Time: {times[-1]}s")
     fig.show()
-    fig.savefig("robustPCA.png")
 print("Done.")
