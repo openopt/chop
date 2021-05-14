@@ -19,7 +19,7 @@ from chop import utils
 
 
 class L1:
-    """L1 penalty. Batch-wise function. For each element in the batch,
+    """L1 Norm penalty. Batch-wise function. For each element in the batch,
     the L1 penalty is given by
     ..math::
         \Omega(x) = \alpha \|x\|_1
@@ -46,7 +46,49 @@ class L1:
         batch_size = x.size(0)
         return self.alpha * abs(x.view(batch_size, -1)).sum(dim=-1)
 
-    def prox(self, x, step_size=None):
+    def prox(self, x, step_size):
+        """Proximal operator for the L1 norm penalty. This is given by soft-thresholding.
+
+        Args:
+          x: torch.Tensor
+            x has shape (batch_size, *)
+          step_size: float or torch.Tensor of shape (batch_size,)
+        
+        """
+        if isinstance(step_size, Number):
+            step_size = step_size * torch.ones(x.size(0), device=x.device, dtype=x.dtype)
+        return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size.view((-1,) + (1,) * (x.dim() - 1))))
+
+
+class NuclearNorm:
+    """Nuclear Norm penalty. Batch-wise function. For each element in the batch,
+    the L1 penalty is given by
+    ..math::
+        \Omega(X) = \alpha \|X\|_*
+    """
+
+    def __init__(self, alpha: float):
+        """
+        Args:
+          alpha: float
+            Size of the penalty. Must be non-negative.
+        """
+        if alpha < 0:
+            raise ValueError("alpha must be non negative.")
+        self.alpha = alpha
+
+    def __call__(self, x):
+        """
+        Returns the value of the penalty on x, batch_size.
+
+        Args:
+          x: torch.Tensor
+            x has shape (batch_size, *)
+        """
+        batch_size = x.size(0)
+        return self.alpha * abs(x.view(batch_size, -1)).sum(dim=-1)
+
+    def prox(self, x, step_size):
         """Proximal operator for the L1 norm penalty. This is given by soft-thresholding.
 
         Args:

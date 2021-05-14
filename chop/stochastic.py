@@ -27,7 +27,7 @@ class Prox(nn.Module):
 
     def forward(self, x, s=None):
         if self.prox_fun is not None:
-            return self.prox_fun(x.unsqueeze(0)).squeeze(0)
+            return self.prox_fun(x.unsqueeze(0), s).squeeze(0)
         else:
             return x
 
@@ -732,8 +732,8 @@ class SplittingProxFW(Optimizer):
                     state['prox_y'] = group['prox_y'][idx]
                     state['lmo'] = group['lmo'][idx]
                     # split variable: p = x + y and make feasible
-                    state['x'] = state['prox'](.5 * p.detach().clone())
-                    state['y'] = state['prox_y'](.5 * p.detach().clone())
+                    state['x'] = state['prox'](.5 * p.detach().clone(), 1.)
+                    state['y'] = state['prox_y'](.5 * p.detach().clone(), 1.)
                     # initialize grad estimate
                     state['grad_est'] = torch.zeros_like(p)
 
