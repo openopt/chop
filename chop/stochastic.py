@@ -14,6 +14,7 @@ import warnings
 import torch
 from torch import nn
 from torch.optim import Optimizer
+import torch.nn.functional as F
 import numpy as np
 
 
@@ -41,7 +42,6 @@ class LMO(nn.Module):
         update_direction, max_step_size = self.lmo_fun(
             u.unsqueeze(0), x.unsqueeze(0))
         return update_direction.squeeze(dim=0), max_step_size.squeeze(dim=0)
-
 
 
 def backtracking_step_size(
@@ -646,7 +646,8 @@ class SplittingProxFW(Optimizer):
                  lr=.1,
                  lipschitz=1.,
                  momentum=0., weight_decay=0.,
-                 normalization='none', generalized_lmo=False):
+                 normalization='none', generalized_lmo=False,
+                 ):
         params = list(params)
 
         # initialize proxes
@@ -698,8 +699,8 @@ class SplittingProxFW(Optimizer):
                         lipschitz=lipschitz,
                         weight_decay=weight_decay,
                         normalization=normalization,
-                        generalized_lmo=generalized_lmo)
-
+                        generalized_lmo=generalized_lmo
+                        )
         super(SplittingProxFW, self).__init__(useable_params, defaults)
 
     @torch.no_grad()
@@ -756,19 +757,27 @@ class SplittingProxFW(Optimizer):
                 state['step'] += 1.
                 state['grad_est'].add_(
                     grad - state['grad_est'], alpha=1. - state['momentum'])
+                state['lr_prox'] = state['lr'] * state['lipschitz']
 
                 if group['generalized_lmo']:
-                    y_update, max_step_size = state['lmo'](
-                        -state['grad_est'], state['y'],
-                        {'lipschitz': state['lipschitz'],
-                         'step_size': state['lr']}
+                    state['lr_prox'] *= 2
+                    atom, scale = state['lmo'](
+                        -state['grad_est'], state['y']
                     )
+                    magnitude = (atom * (.5 * state['grad_est'] / (state['lipschitz'] * state['lr']) - state['y'])).sum() - scale
+                    from icecream import ic
+                    # ic(magnitude)
+                    magnitude /= torch.linalg.norm(atom) ** 2
+                    magnitude = F.relu(magnitude)
+                    w = magnitude * atom
+                    v = state['prox'](
+                        state['x'] - w - state['grad_est'] / state['lr_prox'], state['lr_prox'])
+                    y_update = w - state['y']
+
                 else:
                     y_update, max_step_size = state['lmo'](
                         -state['grad_est'], state['y'])
-
-                state['lr_prox'] = state['lr'] * state['lipschitz']
-                state['lr'] = min(max_step_size, state['lr'])
+                    state['lr'] = min(max_step_size, state['lr'])
 
                 if group['normalization'] == 'gradient':
                     # Normalize LMO update direction

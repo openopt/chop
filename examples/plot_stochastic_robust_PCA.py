@@ -18,9 +18,8 @@ import matplotlib.pyplot as plt
 import torch
 import chop
 from chop import utils
-from chop.utils.logging import Trace
 from time import time
-
+import numpy as np
 
 torch.manual_seed(0)
 
@@ -34,11 +33,11 @@ r_p = [(5, 1e-3),
        (25, 3e-2), (130, 1e-2)
        ]
 
-n_epochs = 200
+n_epochs = 1000
 
 sqloss = torch.nn.MSELoss(reduction='sum')
-lam = 1e6
-freq = 50
+lam = 1. / np.sqrt(m)
+freq = 100
 
 for r, p in r_p:
     print(f'r={r} and p={p}')
@@ -60,7 +59,7 @@ for r, p in r_p:
     M = M.to(device)
     
     # From Candès paper
-    mu = (m * n) / (8 * torch.linalg.norm(M, ord='fro') ** 2)
+    mu = (m * n) / (8 * torch.linalg.norm(M.view(-1), ord=1))
 
     rnuc = torch.linalg.norm(L.squeeze(), ord='nuc')
     sL1 = abs(S).sum()
@@ -70,13 +69,14 @@ for r, p in r_p:
 
     rank_constraint = chop.constraints.NuclearNormBall(rnuc)
     rank_penalty = chop.penalties.NuclearNorm(1.)
-    # sparsity_constraint = chop.constraints.L1Ball(sL1)
+    sparsity_constraint = chop.constraints.L1Ball(sL1)
     sparsity_penalty = chop.penalties.L1(lam)
 
-    lmo = rank_constraint.lmo
+    lmo = rank_penalty.lmo
+    # lmo = rank_constraint.lmo
     # prox = sparsity_constraint.prox
     prox = sparsity_penalty.prox
-    prox_lr = rank_constraint.prox
+    prox_lr = rank_penalty.prox
 
     batch_sizes = [100, 250, 500, 1000]
     fig, axes = plt.subplots(nrows=2, ncols=len(batch_sizes), figsize=(18, 10), sharey=True)
@@ -96,7 +96,8 @@ for r, p in r_p:
                                                     lr='sublinear',
                                                     lipschitz=1.,
                                                     normalization='none',
-                                                    momentum=momentum)
+                                                    momentum=momentum,
+                                                    generalized_lmo=True)
 
 
         train_losses = []
@@ -118,7 +119,7 @@ for r, p in r_p:
                     with torch.no_grad():
                         times.append(time() - start)
                         full_loss = sqloss(Z, M)
-                        print(full_loss)
+                        print(full_loss / torch.linalg.norm(M))
                         train_losses.append(loss.item())
                         losses.append(full_loss.item())
                 optimizer.step()
@@ -143,7 +144,7 @@ for r, p in r_p:
         print(f"Sparse loss: {torch.linalg.norm(S - sparse_comp) / torch.linalg.norm(S)}")
         print(f"Reconstruction loss: {torch.linalg.norm(M - sparse_comp - lr_comp) / torch.linalg.norm(M)}")
         print(f"Time: {times[-1]}s")
-        break
+        
     fig.show()
-    fig.savefig("robustPCA.png")
+    fig.savefig(f"robustPCA_{r_p}.png")
 print("Done.")

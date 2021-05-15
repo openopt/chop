@@ -19,14 +19,6 @@ from chop import utils
 from chop import constraints
 
 
-def penalty_lmo_step(atom, iterate, grad, kwargs):
-    sqfronorm_atom = torch.linalg.norm(atom, ord='fro', dim=(-2, -1)) ** 2
-    step = (atom * iterate).sum(dim=(-2, -1)) \
-            - 2 * (self.alpha - kwargs['step_size'] * (atom * grad).sum(dim=(-2, -1))) \
-              / (kwargs['lipschitz'] * kwargs['step_size'] ** 2)
-    step = utils.bdiv(step, sqfronorm_atom)
-    return step
-    
 
 class L1:
     """L1 Norm penalty. Batch-wise function. For each element in the batch,
@@ -56,6 +48,7 @@ class L1:
         batch_size = x.size(0)
         return self.alpha * abs(x.view(batch_size, -1)).sum(dim=-1)
 
+    @torch.no_grad()
     def prox(self, x, step_size):
         """Proximal operator for the L1 norm penalty. This is given by soft-thresholding.
 
@@ -69,6 +62,22 @@ class L1:
             step_size = step_size * torch.ones(x.size(0), device=x.device, dtype=x.dtype)
         return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size.view((-1,) + (1,) * (x.dim() - 1))))
 
+    @torch.no_grad()
+    def lmo(self, grad, iterate, splitting=False, **kwargs):
+        """Generalized LMO for the Nuclear norm penalty"""
+        batch_sizes = grad.shape[:-2]
+        if not batch_sizes:
+            batch_sizes = [1]
+        at = self.atom(grad)
+        step = penalty_lmo_step(self.alpha, at, splitting, **kwargs)
+        return step * at - iterate, torch.ones(*batch_sizes, dtype=iterate.dtype)
+
+    @torch.no_grad()
+    def atom(self, x):
+        ball = constraints.L1Ball(1.)
+        update_direction, _ = ball.lmo(grad, iterate)
+        return update_direction + iterate
+        
 
 class NuclearNorm:
     """Nuclear Norm penalty. Batch-wise function. For each element in the batch,
@@ -119,16 +128,16 @@ class NuclearNorm:
         return U @ torch.diag_embed(S_thresh) @ VT
 
     @torch.no_grad()
-    def lmo(self, grad, iterate, **kwargs):
-        """Generalized LMO for the Nuclear norm penalty"""
+    def lmo(self, grad, iterate):
+        """Generalized LMO for the Nuclear norm penalty.
+        This function returns an atom in the constraint set, most aligned with grad."""
         batch_sizes = grad.shape[:-2]
         if not batch_sizes:
             batch_sizes = [1]
         ball = constraints.NuclearNormBall(1.)
         update_direction, _ = ball.lmo(grad, iterate)
         atom = update_direction + iterate
-        step = penalty_lmo_step(atom, iterate, grad, **kwargs)
-        return step * atom - iterate, torch.ones(*batch_sizes, dtype=iterate.dtype)
+        return atom, self.alpha * torch.ones(*batch_sizes, dtype=grad.dtype, device=grad.device)
 
 
 class GroupL1:
