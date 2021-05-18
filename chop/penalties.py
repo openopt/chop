@@ -121,10 +121,9 @@ class NuclearNorm:
             batch_sizes = [1]
         if isinstance(step_size, Number):
             step_size = step_size * torch.ones(*batch_sizes, device=x.device, dtype=x.dtype)
-        U, S, V = torch.svd(x, False)
+        U, S, VT = torch.linalg.svd(x)
         L1penalty = L1(self.alpha)
         S_thresh = L1penalty.prox(S, step_size)
-        VT = V.transpose(-2, -1)
         return U @ torch.diag_embed(S_thresh) @ VT
 
     @torch.no_grad()
