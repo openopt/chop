@@ -68,7 +68,6 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
         if is_bias(name, param):
             constraint = None
         else:
-            print(name)
             if mode == 'radius':
                 alpha = value
             elif mode == 'initialization':
