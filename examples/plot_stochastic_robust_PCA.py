@@ -78,8 +78,9 @@ for r, p in r_p:
     prox = sparsity_penalty.prox
     prox_lr = rank_penalty.prox
 
-    batch_sizes = [100, 250, 500, 1000]
-    fig, axes = plt.subplots(nrows=2, ncols=len(batch_sizes), figsize=(18, 10), sharey=True)
+    # batch_sizes = [100, 250, 500, 1000]
+    batch_sizes = [1000]
+    fig, axes = plt.subplots(nrows=2, ncols=max(len(batch_sizes), 2), figsize=(18, 10), sharey=True)
     fig.suptitle(f'r={r} and p={p}')
 
     for batch_size, ax_it, ax_time in zip(batch_sizes, axes[0], axes[1]):
@@ -110,7 +111,7 @@ for r, p in r_p:
             for zi, mi in loader:
                 n_it += 1
                 optimizer.zero_grad()
-                loss = mu * sqloss(zi, mi)
+                loss = mu * sqloss(zi, mi) * Z.size(0) / zi.size(0)
                 loss.backward()
                 sgrad = Z.grad.detach().clone()
                 sgrad_avg += sgrad
@@ -118,7 +119,7 @@ for r, p in r_p:
                 if n_it % freq == 0:
                     with torch.no_grad():
                         times.append(time() - start)
-                        full_loss = sqloss(Z, M)
+                        full_loss = mu * sqloss(Z, M) + torch.linalg.norm(optimizer.state[Z]['y'], ord='nuc') + lam * optimizer.state[Z]['x'].abs().sum()
                         print(full_loss / torch.linalg.norm(M))
                         train_losses.append(loss.item())
                         losses.append(full_loss.item())
@@ -144,7 +145,7 @@ for r, p in r_p:
         print(f"Sparse loss: {torch.linalg.norm(S - sparse_comp) / torch.linalg.norm(S)}")
         print(f"Reconstruction loss: {torch.linalg.norm(M - sparse_comp - lr_comp) / torch.linalg.norm(M)}")
         print(f"Time: {times[-1]}s")
-        
+        break
     fig.show()
-    fig.savefig(f"robustPCA_{r_p}.png")
+    fig.savefig(f"robustPCA_{r, p}.png")
 print("Done.")
