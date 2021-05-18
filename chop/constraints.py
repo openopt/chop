@@ -513,13 +513,12 @@ class NuclearNormBall:
         """
         Projection operator on the Nuclear Norm constraint set.
         """
-        U, S, VT = torch.linalg.svd(x)
+        U, S, VT = torch.linalg.svd(x, full_matrices=False)
         # Project S on the alpha-L1 ball
         ball = L1Ball(self.alpha)
 
         S_proj = ball.prox(S.view(-1, S.size(-1))).view_as(S)
-
-        return torch.matmul(U, torch.matmul(torch.diag_embed(S_proj), VT))
+        return U @ torch.diag_embed(S_proj) @ VT
 
     def is_feasible(self, x, atol=1e-5, rtol=1e-5):
         norms = torch.linalg.norm(x, dim=(-2, -1), ord='nuc')

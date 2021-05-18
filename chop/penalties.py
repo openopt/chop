@@ -11,6 +11,7 @@ The proximal operators are derived e.g. in https://www.di.ens.fr/~fbach/opt_book
 """
 
 from numbers import Number
+import numpy as np
 from numpy.core.fromnumeric import nonzero
 import torch
 import torch.nn.functional as F
@@ -63,20 +64,14 @@ class L1:
         return utils.bmul(torch.sign(x), F.relu(abs(x) - self.alpha * step_size.view((-1,) + (1,) * (x.dim() - 1))))
 
     @torch.no_grad()
-    def lmo(self, grad, iterate, splitting=False, **kwargs):
-        """Generalized LMO for the Nuclear norm penalty"""
-        batch_sizes = grad.shape[:-2]
+    def lmo(self, grad, iterate):
+        *batch_sizes, m, n = iterate.shape
         if not batch_sizes:
             batch_sizes = [1]
-        at = self.atom(grad)
-        step = penalty_lmo_step(self.alpha, at, splitting, **kwargs)
-        return step * at - iterate, torch.ones(*batch_sizes, dtype=iterate.dtype)
-
-    @torch.no_grad()
-    def atom(self, x):
         ball = constraints.L1Ball(1.)
         update_direction, _ = ball.lmo(grad, iterate)
-        return update_direction + iterate
+        atom = update_direction + iterate
+        return atom, self.alpha * torch.ones(*batch_sizes, dtype=grad.dtype, device=grad.device)
         
 
 class NuclearNorm:
@@ -121,9 +116,10 @@ class NuclearNorm:
             batch_sizes = [1]
         if isinstance(step_size, Number):
             step_size = step_size * torch.ones(*batch_sizes, device=x.device, dtype=x.dtype)
-        U, S, VT = torch.linalg.svd(x)
+        U, S, VT = torch.linalg.svd(x, full_matrices=False)
         L1penalty = L1(self.alpha)
-        S_thresh = L1penalty.prox(S, step_size)
+        S_thresh = L1penalty.prox(S.reshape(np.prod(batch_sizes), S.size(-1)), step_size)
+        S_thresh = S_thresh.reshape(*batch_sizes, S.size(-1))
         return U @ torch.diag_embed(S_thresh) @ VT
 
     @torch.no_grad()
