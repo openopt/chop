@@ -760,7 +760,6 @@ class SplittingProxFW(Optimizer):
                 state['lr_prox'] = state['lr'] * state['lipschitz']
 
                 if group['generalized_lmo']:
-                    state['lr_prox'] *= 2
                     atom, scale = state['lmo'](
                         -state['grad_est'], state['y']
                     )
