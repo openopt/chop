@@ -76,7 +76,7 @@ class L1:
 
 class NuclearNorm:
     """Nuclear Norm penalty. Batch-wise function. For each element in the batch,
-    the L1 penalty is given by
+    the penalty is given by
     ..math::
         \Omega(X) = \alpha \|X\|_*
     """
@@ -111,16 +111,18 @@ class NuclearNorm:
           step_size: float or torch.Tensor of shape (*batch_sizes,)
         
         """
-        *batch_sizes, m, n = x.shape
+        orig_shape = x.shape
+        *batch_sizes, m, n = orig_shape
         if not batch_sizes:
             batch_sizes = [1]
+
         if isinstance(step_size, Number):
             step_size = step_size * torch.ones(*batch_sizes, device=x.device, dtype=x.dtype)
         U, S, VT = torch.linalg.svd(x, full_matrices=False)
         L1penalty = L1(self.alpha)
         S_thresh = L1penalty.prox(S.reshape(np.prod(batch_sizes), S.size(-1)), step_size)
         S_thresh = S_thresh.reshape(*batch_sizes, S.size(-1))
-        return U @ torch.diag_embed(S_thresh) @ VT
+        return (U @ torch.diag_embed(S_thresh) @ VT).reshape(*orig_shape)
 
     @torch.no_grad()
     def lmo(self, grad, iterate):

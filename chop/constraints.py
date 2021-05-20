@@ -18,6 +18,7 @@ import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
 from chop import utils
+from chop import penalties
 
 
 @torch.no_grad()
@@ -36,8 +37,8 @@ def is_bias(name, param):
 
 
 @torch.no_grad()
-def make_model_constraints(model, ord=2, value=300, mode='initialization', constrain_bias=False):
-    """Create Ball constraints for each layer of model. Ball radius depends on mode (either radius or
+def make_model_constraints(model, ord=2, value=300, mode='initialization', constrain_bias=False, penalty=False):
+    """Create Ball constraints / penalties for each layer of model. Ball radius / penalty depends on mode (either radius or
     factor to multiply average initialization norm with)"""
     constraints = []
 
@@ -71,14 +72,25 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
             if mode == 'radius':
                 alpha = value
             elif mode == 'initialization':
-                alpha = value * init_norms[param.shape]
+                if penalty:
+                    alpha = value / init_norms[param.shape]
+                else:
+                    alpha = value * init_norms[param.shape]
             else:
                 msg = f"Unknown mode {mode}."
                 raise ValueError(msg)
             if (type(ord) == int) or (ord == np.inf):
-                constraint = make_LpBall(alpha, p=ord)
+                if penalty:
+                    if ord != 1:
+                        raise NotImplementedError("Please use ord=1 or ord='nuc'.")
+                    constraint = penalties.L1(alpha)
+                else:
+                    constraint = make_LpBall(alpha, p=ord)
             elif ord == 'nuc':
-                constraint = NuclearNormBall(alpha)
+                if penalty:
+                    constraint = penalties.NuclearNorm(alpha)
+                else:
+                    constraint = NuclearNormBall(alpha)
             else:
                 msg = f"ord {ord} is not supported."
                 raise ValueError(msg)
