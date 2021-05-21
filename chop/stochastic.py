@@ -787,7 +787,6 @@ class SplittingProxFW(Optimizer):
                     state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], state['lr_prox'])
                 x_update = v - state['x']
 
-                # print(state['lr'], state['lr_prox'])
                 state['y'].add_(y_update, alpha=state['lr'])
                 state['x'].add_(x_update, alpha=state['lr'])
 
