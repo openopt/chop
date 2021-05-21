@@ -774,18 +774,20 @@ class SplittingProxFW(Optimizer):
                     y_update, max_step_size = state['lmo'](
                         -state['grad_est'], state['y'])
                     state['lr'] = min(max_step_size, state['lr'])
+                    w = y_update + state['y']
 
                 if group['normalization'] == 'gradient':
                     # Normalize LMO update direction
                     grad_norm = torch.linalg.norm(state['grad_est'])
                     y_update_norm = torch.linalg.norm(y_update)
                     y_update *= min(1, grad_norm / y_update_norm)
+                    w = y_update + state['y']
 
-                w = y_update + state['y']
                 v = state['prox'](
                     state['x'] + state['y'] - w - state['grad_est'] / state['lr_prox'], state['lr_prox'])
                 x_update = v - state['x']
 
+                # print(state['lr'], state['lr_prox'])
                 state['y'].add_(y_update, alpha=state['lr'])
                 state['x'].add_(x_update, alpha=state['lr'])
 
