@@ -58,7 +58,6 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
                             None))]:
                     param = getattr(layer, param_type)
                     shape = param.shape
-                    # TODO: figure out how to set the constraint size for NuclearNormBall constraint
                     avg_norm = get_avg_init_norm(layer, param_type=param_type, ord=2)
                     if avg_norm == 0.0:
                         # Catch unlikely case that weight/bias is 0-initialized (e.g. BatchNorm does this)
