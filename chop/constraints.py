@@ -356,9 +356,9 @@ class L1Ball(LpBall):
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
         batch_size = iterate.size(0)
-        flatten_abs_grad = abs_grad.view(batch_size, -1)
+        flatten_abs_grad = abs_grad.reshape(batch_size, -1)
         flatten_largest_mask = (flatten_abs_grad == flatten_abs_grad.max(-1, True)[0])
-        largest = torch.where(flatten_largest_mask.view_as(abs_grad))
+        largest = torch.where(flatten_largest_mask.reshape_as(abs_grad))
 
         update_direction[largest] += self.alpha * torch.sign(
             grad[largest])

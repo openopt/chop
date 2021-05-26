@@ -20,7 +20,6 @@ from chop import utils
 from chop import constraints
 
 
-
 class L1:
     """L1 Norm penalty. Batch-wise function. For each element in the batch,
     the L1 penalty is given by
@@ -65,13 +64,13 @@ class L1:
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
-        *batch_sizes, m, n = iterate.shape
-        if not batch_sizes:
-            batch_sizes = [1]
+        """Generalized LMO for the L1 norm penalty.
+        This function returns an atom in the constraint set, most aligned with grad."""
+        batch_size = grad.size(0)
         ball = constraints.L1Ball(1.)
         update_direction, _ = ball.lmo(grad, iterate)
         atom = update_direction + iterate
-        return atom, self.alpha * torch.ones(*batch_sizes, dtype=grad.dtype, device=grad.device)
+        return atom, self.alpha * torch.ones(batch_size, dtype=grad.dtype, device=grad.device)
         
 
 class NuclearNorm:
