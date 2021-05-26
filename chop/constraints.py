@@ -143,17 +143,18 @@ def euclidean_proj_simplex(v, s=1.):
       http://www.cs.berkeley.edu/~jduchi/projects/DuchiSiShCh08.pdf
   """
     assert s > 0, "Radius s must be strictly positive (%d <= 0)" % s
-    (n,) = v.shape
+    b, n = v.shape
     # check if we are already on the simplex
-    if v.sum() == s and (v >= 0).all():
+    if (v.sum(-1) == s).all() and (v >= 0).all():
         return v
     # get the array of cumulative sums of a sorted (decreasing) copy of v
-    u, _ = torch.sort(v, descending=True)
+    u, _ = torch.sort(v, dim=-1, descending=True)
     cssv = torch.cumsum(u, dim=-1)
     # get the number of > 0 components of the optimal solution
-    rho = (u * torch.arange(1, n + 1, device=v.device) > (cssv - s)).sum() - 1
+    rho = (u * torch.arange(1, n + 1, device=v.device) > (cssv - s)).sum(-1) - 1
     # compute the Lagrange multiplier associated to the simplex constraint
-    theta = (cssv[rho] - s) / (rho + 1.0)
+    theta = (cssv[torch.arange(b, device=v.device), rho] - s) / (rho + 1.0)
+    theta = theta.unsqueeze(-1).expand_as(v)
     # compute the projection by thresholding v using theta
     w = torch.clamp(v - theta, min=0)
     return w
@@ -184,14 +185,12 @@ def euclidean_proj_l1ball(v, s=1.):
   euclidean_proj_simplex
   """
     assert s >= 0, "Radius s must be strictly positive (%d <= 0)" % s
-    if len(v.shape) > 1:
-        raise ValueError
     if s == 0:
         return torch.zeros_like(v)
     # compute the vector of absolute values
     u = abs(v)
     # check if v is already a solution
-    if u.sum() <= s:
+    if (u.sum(-1) <= s).all():
         # L1-norm is <= s
         return v
     # v is not already a solution: optimum lies on the boundary (norm == s)
@@ -382,9 +381,8 @@ class L1Ball(LpBall):
         shape = x.shape
         flattened_x = x.reshape(shape[0], -1)
         # TODO vectorize this
-        projected = [euclidean_proj_l1ball(row, s=self.alpha) for row in flattened_x]
-        x = torch.stack(projected)
-        return x.reshape(*shape)
+        projected = euclidean_proj_l1ball(flattened_x, s=self.alpha)
+        return projected.reshape(*shape)
 
 
 class L2Ball(LpBall):
@@ -463,9 +461,8 @@ class Simplex:
     def prox(self, x, step_size=None):
         shape = x.shape
         flattened_x = x.view(shape[0], -1)
-        projected = [euclidean_proj_simplex(row, s=self.alpha) for row in flattened_x]
-        x = torch.stack(projected)
-        return x.view(*shape)
+        projected = euclidean_proj_simplex(flattened_x, s=self.alpha)
+        return projected.view(*shape)
 
     @torch.no_grad()
     def lmo(self, grad, iterate, step_size=None):
