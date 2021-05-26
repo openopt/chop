@@ -83,18 +83,19 @@ class CIFAR10(Dataset):
     def __init__(self, data_dir, normalize=True):
         """Initializes Dataset"""
         self.mean = torch.Tensor((0.4914, 0.4822, 0.4465))
-        self.mean = self.mean[..., None, None]
         self.std = torch.Tensor((0.2023, 0.1994, 0.2010))
-        self.std = self.std[..., None, None]
 
         self.normalize = t.Normalize(self.mean, self.std)
         self.unnormalize = t.Normalize(-self.mean / self.std, 1. / self.std)
-
+        
         transforms_train = [
-            t.RandomCrop(32, padding=4),
-            t.RandomHorizontalFlip(),
-            t.ToTensor(),
-        ]
+                    t.RandomCrop(32, padding=4),
+                    t.RandomHorizontalFlip(),
+                    t.ColorJitter(.25,.25,.25),
+                    t.RandomRotation(2),
+                    t.ToTensor(),
+                ]
+        
         transforms_test = [t.ToTensor()]
 
         if normalize:
