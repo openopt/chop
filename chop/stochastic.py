@@ -486,30 +486,27 @@ class FrankWolfe(Optimizer):
     name = 'Frank-Wolfe'
     POSSIBLE_NORMALIZATIONS = {'gradient', 'none'}
 
-    def __init__(self, params, lmo, lr=.1, momentum=0.,
+    def __init__(self, params, lmo, prox=None, lr=.1, momentum=0.,
                  weight_decay=0.,
                  normalization='none'):
 
-        lmo_candidates = []
-        for oracle in lmo:
-            if oracle is None:
-                # Then FW will not be used on this parameter
-                _lmo = None
-            else:
-                def _lmo(u, x):
-                    update_direction, max_step_size = oracle(
-                        u.unsqueeze(0), x.unsqueeze(0))
-                    return update_direction.squeeze(dim=0), max_step_size
-            lmo_candidates.append(_lmo)
+        if prox is None:
+            prox = [None] * len(params)
 
-        self.lmo = []
+        lmo_candidates = [LMO(oracle) if oracle else None for oracle in lmo]
+        prox = [Prox(oracle) for oracle in prox]
+
         useable_params = []
-        for param, oracle in zip(params, lmo):
-            if oracle:
+        lmos = []
+        proxes = []
+
+        for k, (param, lmo_oracle, prox_oracle) in enumerate(zip(params, lmo_candidates, prox)):
+            if lmo_oracle is not None:
                 useable_params.append(param)
-                self.lmo.append(oracle)
+                lmos.append(lmo_oracle)
+                proxes.append(prox_oracle)
             else:
-                msg = (f"No LMO was provided for parameter {param}. "
+                msg = (f"No LMO was provided for parameter {k}. "
                        f"Frank-Wolfe will not optimize this parameter. "
                        f"Please use another optimizer.")
                 warnings.warn(msg)
@@ -529,7 +526,7 @@ class FrankWolfe(Optimizer):
             raise ValueError(
                 f"Normalization must be in {self.POSSIBLE_NORMALIZATIONS}.")
         self.normalization = normalization
-        defaults = dict(lmo=self.lmo, name=self.name, lr=self.lr,
+        defaults = dict(lmo=lmos, prox=proxes, name=self.name, lr=self.lr,
                         momentum=self.momentum,
                         weight_decay=weight_decay,
                         normalization=self.normalization)
@@ -556,8 +553,8 @@ class FrankWolfe(Optimizer):
         if closure is not None:
             with torch.enable_grad():
                 loss = closure()
-        idx = 0
         for group in self.param_groups:
+            idx = 0
             for p in group['params']:
                 if p.grad is None:
                     continue
@@ -570,7 +567,10 @@ class FrankWolfe(Optimizer):
                     state['step'] = 0
                     state['grad_estimate'] = torch.zeros_like(
                         p, memory_format=torch.preserve_format)
-
+                    state['prox'] = group['prox'][idx]
+                    state['lmo'] = group['lmo'][idx]
+                    # make sure p is in the constraint set
+                    p.copy_(state['prox'](p, 1.))
                 if self.lr == 'sublinear':
                     step_size = 1. / (state['step'] + 1.)
                 elif type(self.lr) == float:
@@ -588,7 +588,7 @@ class FrankWolfe(Optimizer):
 
                 state['grad_estimate'].add_(
                     grad - state['grad_estimate'], alpha=1. - momentum)
-                update_direction, _ = self.lmo[idx](-state['grad_estimate'], p)
+                update_direction, _ = state['lmo'](-state['grad_estimate'], p)
                 state['certificate'] = (-state['grad_estimate']
                                         * update_direction).sum()
                 if group['normalization'] == 'gradient':
@@ -778,13 +778,13 @@ class SplittingProxFW(Optimizer):
 
                 if group['normalization'] == 'gradient':
                     # Normalize LMO update direction
-                    grad_norm = torch.linalg.norm(state['grad_est'])
+                    grad_norm = torch.linalg.norm(grad)
                     y_update_norm = torch.linalg.norm(y_update)
                     y_update *= min(1, grad_norm / y_update_norm)
                     w = y_update + state['y']
 
                 v = state['prox'](
-                    p - w - state['grad_est'] / state['lr_prox'], state['lr_prox'])
+                    p - w - state['grad_est'] / state['lr_prox'], 1. / state['lr_prox'])
                 x_update = v - state['x']
 
                 state['y'].add_(y_update, alpha=state['lr'])
