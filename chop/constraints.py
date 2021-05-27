@@ -510,9 +510,10 @@ class NuclearNormBall:
           update_direction: torch.Tensor of shape (*, m, n)
         """
         update_direction = -iterate.clone().detach()
-        u, _, v = utils.power_iteration(grad)
-        atom = u.unsqueeze(-1) * v.unsqueeze(-2)
-        update_direction += self.alpha * atom
+        if self.alpha > 0.:
+            u, _, v = utils.power_iteration(grad)
+            atom = u.unsqueeze(-1) * v.unsqueeze(-2)
+            update_direction += self.alpha * atom
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
@@ -520,6 +521,8 @@ class NuclearNormBall:
         """
         Projection operator on the Nuclear Norm constraint set.
         """
+        if self.alpha == 0:
+            return torch.zeros_like(x)
         U, S, VT = torch.linalg.svd(x, full_matrices=False)
         # Project S on the alpha-L1 ball
         ball = L1Ball(self.alpha)
