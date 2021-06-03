@@ -12,6 +12,7 @@ import torch
 from torch import nn
 import torchvision
 from torchvision import transforms as t
+from torchvision import transforms
 
 
 class Dataset:
@@ -31,10 +32,10 @@ class Dataset:
                 pin_memory=True, shuffle=True):
         """Load training and test data."""
 
-        train_loader = torch.utils.data.DataLoader(self.dataset.train, batch_size=train_batch_size, shuffle=shuffle, num_workers=num_workers,
-                                                pin_memory=pin_memory)
-        test_loader = torch.utils.data.DataLoader(self.dataset.test, batch_size=test_batch_size, shuffle=False, num_workers=num_workers,
-                                                pin_memory=pin_memory)
+        train_loader = torch.utils.data.DataLoader(self.dataset.train, batch_size=train_batch_size, 
+                                                   shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
+        test_loader = torch.utils.data.DataLoader(self.dataset.test, batch_size=test_batch_size, 
+                                                  shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
         return EasyDict(train=train_loader, test=test_loader)
 
     def load_k(self, k, train, device, shuffle=True, num_workers=2, pin_memory=False):
@@ -124,6 +125,37 @@ class CIFAR10(Dataset):
         }
 
 
+
+class Lighting(object):
+    """
+    Lighting noise (see https://git.io/fhBOc)
+    """
+    def __init__(self, alphastd, eigval, eigvec):
+        self.alphastd = alphastd
+        self.eigval = eigval
+        self.eigvec = eigvec
+
+    def __call__(self, img):
+        if self.alphastd == 0:
+            return img
+
+        alpha = img.new().resize_(3).normal_(0, self.alphastd)
+        rgb = self.eigvec.type_as(img).clone()\
+            .mul(alpha.view(1, 3).expand(3, 3))\
+            .mul(self.eigval.view(1, 3).expand(3, 3))\
+            .sum(1).squeeze()
+
+        return img.add(rgb.view(3, 1, 1).expand_as(img))
+
+IMAGENET_PCA = {
+    'eigval':ch.Tensor([0.2175, 0.0188, 0.0045]),
+    'eigvec':ch.Tensor([
+        [-0.5675,  0.7192,  0.4009],
+        [-0.5808, -0.0045, -0.8140],
+        [-0.5836, -0.6948,  0.4203],
+    ])
+}
+        
 class ImageNet(Dataset):
 
     def __init__(self, data_dir, normalize=True):
@@ -136,12 +168,21 @@ class ImageNet(Dataset):
         self.unnormalize = t.Normalize(-self.mean / self.std, 1./self.std)
 
         transforms_train = [
-            t.RandomResizedCrop(224),
-            t.RandomHorizontalFlip(),
-            t.ToTensor()
-            ]
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ColorJitter(
+                brightness=0.1,
+                contrast=0.1,
+                saturation=0.1
+            ),
+            transforms.ToTensor(),
+            Lighting(0.05, IMAGENET_PCA['eigval'], 
+                          IMAGENET_PCA['eigvec'])
+        ]
 
-        transforms_test = [t.ToTensor()]
+        transforms_test = [transforms.Resize(256),
+                           transforms.CenterCrop(224),
+                           transforms.ToTensor()]
 
         if normalize:
             transforms_train.append(self.normalize)
