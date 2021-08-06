@@ -148,8 +148,8 @@ class Lighting(object):
         return img.add(rgb.view(3, 1, 1).expand_as(img))
 
 IMAGENET_PCA = {
-    'eigval':ch.Tensor([0.2175, 0.0188, 0.0045]),
-    'eigvec':ch.Tensor([
+    'eigval':torch.Tensor([0.2175, 0.0188, 0.0045]),
+    'eigvec':torch.Tensor([
         [-0.5675,  0.7192,  0.4009],
         [-0.5808, -0.0045, -0.8140],
         [-0.5836, -0.6948,  0.4203],
