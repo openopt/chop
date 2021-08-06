@@ -18,6 +18,7 @@ import numpy as np
 from scipy.stats import expon
 from torch.distributions import Laplace, Normal
 from chop import utils
+from chop import penalties
 
 
 @torch.no_grad()
@@ -36,8 +37,8 @@ def is_bias(name, param):
 
 
 @torch.no_grad()
-def make_model_constraints(model, ord=2, value=300, mode='initialization', constrain_bias=False):
-    """Create Ball constraints for each layer of model. Ball radius depends on mode (either radius or
+def make_model_constraints(model, ord=2, value=300, mode='initialization', constrain_bias=False, penalty=False):
+    """Create Ball constraints / penalties for each layer of model. Ball radius / penalty depends on mode (either radius or
     factor to multiply average initialization norm with)"""
     constraints = []
 
@@ -57,7 +58,6 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
                             None))]:
                     param = getattr(layer, param_type)
                     shape = param.shape
-                    # TODO: figure out how to set the constraint size for NuclearNormBall constraint
                     avg_norm = get_avg_init_norm(layer, param_type=param_type, ord=2)
                     if avg_norm == 0.0:
                         # Catch unlikely case that weight/bias is 0-initialized (e.g. BatchNorm does this)
@@ -68,18 +68,28 @@ def make_model_constraints(model, ord=2, value=300, mode='initialization', const
         if is_bias(name, param):
             constraint = None
         else:
-            print(name)
             if mode == 'radius':
                 alpha = value
             elif mode == 'initialization':
-                alpha = value * init_norms[param.shape]
+                if penalty:
+                    alpha = value / init_norms[param.shape]
+                else:
+                    alpha = value * init_norms[param.shape]
             else:
                 msg = f"Unknown mode {mode}."
                 raise ValueError(msg)
             if (type(ord) == int) or (ord == np.inf):
-                constraint = make_LpBall(alpha, p=ord)
+                if penalty:
+                    if ord != 1:
+                        raise NotImplementedError("Please use ord=1 or ord='nuc'.")
+                    constraint = penalties.L1(alpha)
+                else:
+                    constraint = make_LpBall(alpha, p=ord)
             elif ord == 'nuc':
-                constraint = NuclearNormBall(alpha)
+                if penalty:
+                    constraint = penalties.NuclearNorm(alpha)
+                else:
+                    constraint = NuclearNormBall(alpha)
             else:
                 msg = f"ord {ord} is not supported."
                 raise ValueError(msg)
@@ -133,17 +143,18 @@ def euclidean_proj_simplex(v, s=1.):
       http://www.cs.berkeley.edu/~jduchi/projects/DuchiSiShCh08.pdf
   """
     assert s > 0, "Radius s must be strictly positive (%d <= 0)" % s
-    (n,) = v.shape
+    b, n = v.shape
     # check if we are already on the simplex
-    if v.sum() == s and (v >= 0).all():
+    if (v.sum(-1) == s).all() and (v >= 0).all():
         return v
     # get the array of cumulative sums of a sorted (decreasing) copy of v
-    u, _ = torch.sort(v, descending=True)
+    u, _ = torch.sort(v, dim=-1, descending=True)
     cssv = torch.cumsum(u, dim=-1)
     # get the number of > 0 components of the optimal solution
-    rho = (u * torch.arange(1, n + 1, device=v.device) > (cssv - s)).sum() - 1
+    rho = (u * torch.arange(1, n + 1, device=v.device) > (cssv - s)).sum(-1) - 1
     # compute the Lagrange multiplier associated to the simplex constraint
-    theta = (cssv[rho] - s) / (rho + 1.0)
+    theta = (cssv[torch.arange(b, device=v.device), rho] - s) / (rho + 1.0)
+    theta = theta.unsqueeze(-1).expand_as(v)
     # compute the projection by thresholding v using theta
     w = torch.clamp(v - theta, min=0)
     return w
@@ -158,13 +169,13 @@ def euclidean_proj_l1ball(v, s=1.):
       
   Args:
   
-    v: (n,) numpy array,
+    v: (n,) torch tensor,
       n-dimensional vector to project
     s: float, optional, default: 1,
       radius of the L1-ball
       
   Returns:
-    w: (n,) numpy array,
+    w: (n,) torch tensor,
       Euclidean projection of v on the L1-ball of radius s
   Notes
   -----
@@ -173,13 +184,13 @@ def euclidean_proj_l1ball(v, s=1.):
   --------
   euclidean_proj_simplex
   """
-    assert s > 0, "Radius s must be strictly positive (%d <= 0)" % s
-    if len(v.shape) > 1:
-        raise ValueError
+    assert s >= 0, "Radius s must be strictly positive (%d <= 0)" % s
+    if s == 0:
+        return torch.zeros_like(v)
     # compute the vector of absolute values
     u = abs(v)
     # check if v is already a solution
-    if u.sum() <= s:
+    if (u.sum(-1) <= s).all():
         # L1-norm is <= s
         return v
     # v is not already a solution: optimum lies on the boundary (norm == s)
@@ -272,7 +283,7 @@ class LinfBall(LpBall):
         return torch.clamp(x, min=-self.alpha, max=self.alpha)
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """Linear Maximization Oracle.
         Return s - iterate with s solving the linear problem
 
@@ -321,7 +332,7 @@ class L1Ball(LpBall):
     p = 1
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """Linear Maximization Oracle.
         Return s - iterate with s solving the linear problem
 
@@ -344,9 +355,9 @@ class L1Ball(LpBall):
         update_direction = -iterate.clone().detach()
         abs_grad = abs(grad)
         batch_size = iterate.size(0)
-        flatten_abs_grad = abs_grad.view(batch_size, -1)
+        flatten_abs_grad = abs_grad.reshape(batch_size, -1)
         flatten_largest_mask = (flatten_abs_grad == flatten_abs_grad.max(-1, True)[0])
-        largest = torch.where(flatten_largest_mask.view_as(abs_grad))
+        largest = torch.where(flatten_largest_mask.reshape_as(abs_grad))
 
         update_direction[largest] += self.alpha * torch.sign(
             grad[largest])
@@ -368,11 +379,10 @@ class L1Ball(LpBall):
             projection of x onto the L1 ball.
         """
         shape = x.shape
-        flattened_x = x.view(shape[0], -1)
+        flattened_x = x.reshape(shape[0], -1)
         # TODO vectorize this
-        projected = [euclidean_proj_l1ball(row, s=self.alpha) for row in flattened_x]
-        x = torch.stack(projected)
-        return x.view(*shape)
+        projected = euclidean_proj_l1ball(flattened_x, s=self.alpha)
+        return projected.reshape(*shape)
 
 
 class L2Ball(LpBall):
@@ -400,7 +410,7 @@ class L2Ball(LpBall):
 
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """Linear Maximization Oracle.
         Return s - iterate with s solving the linear problem
 
@@ -451,12 +461,11 @@ class Simplex:
     def prox(self, x, step_size=None):
         shape = x.shape
         flattened_x = x.view(shape[0], -1)
-        projected = [euclidean_proj_simplex(row, s=self.alpha) for row in flattened_x]
-        x = torch.stack(projected)
-        return x.view(*shape)
+        projected = euclidean_proj_simplex(flattened_x, s=self.alpha)
+        return projected.view(*shape)
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         batch_size = grad.size(0)
         shape = iterate.shape
         max_vals, max_idx = grad.reshape(batch_size, -1).max(-1)
@@ -486,7 +495,7 @@ class NuclearNormBall:
         self.alpha = alpha
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         """
         Computes the LMO for the Nuclear Norm Ball on the last two dimensions.
         Returns :math: `s - $iterate$` where
@@ -501,9 +510,10 @@ class NuclearNormBall:
           update_direction: torch.Tensor of shape (*, m, n)
         """
         update_direction = -iterate.clone().detach()
-        u, _, v = utils.power_iteration(grad)
-        outer = u.unsqueeze(-1) * v.unsqueeze(-2)
-        update_direction += self.alpha * outer
+        if self.alpha > 0.:
+            u, _, v = utils.power_iteration(grad)
+            atom = u.unsqueeze(-1) * v.unsqueeze(-2)
+            update_direction += self.alpha * atom
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
@@ -511,14 +521,14 @@ class NuclearNormBall:
         """
         Projection operator on the Nuclear Norm constraint set.
         """
-        U, S, V = torch.svd(x)
+        if self.alpha == 0:
+            return torch.zeros_like(x)
+        U, S, VT = torch.linalg.svd(x, full_matrices=False)
         # Project S on the alpha-L1 ball
         ball = L1Ball(self.alpha)
 
         S_proj = ball.prox(S.view(-1, S.size(-1))).view_as(S)
-
-        VT = V.transpose(-2, -1)
-        return torch.matmul(U, torch.matmul(torch.diag_embed(S_proj), VT))
+        return U @ torch.diag_embed(S_proj) @ VT
 
     def is_feasible(self, x, atol=1e-5, rtol=1e-5):
         norms = torch.linalg.norm(x, dim=(-2, -1), ord='nuc')
@@ -556,7 +566,7 @@ class GroupL1Ball:
         return group_norms
 
     @torch.no_grad()
-    def lmo(self, grad, iterate):
+    def lmo(self, grad, iterate, step_size=None):
         update_direction = -iterate.detach().clone()
         # find group with largest L2 norm
         group_norms = self.get_group_norms(grad)

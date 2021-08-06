@@ -25,8 +25,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 m = 1000
 n = 1000
 
-r_p = [(5, 1e-3), (5, 3e-3), (25, 1e-3), (25, 3e-3),
-       (25, 3e-2), (130, 1e-2)]
+r_p = [(5, 1e-3),
+    #    (5, 3e-3), (25, 1e-3), (25, 3e-3),
+    #    (25, 3e-2), (130, 1e-2)
+       ]
 
 for r, p in r_p:
     print(f'r={r} and p={p}')
@@ -49,7 +51,7 @@ for r, p in r_p:
 
     @utils.closure
     def sqloss(Z):
-        return .5 * torch.linalg.norm((Z - M).squeeze(), ord='fro') ** 2
+        return .5 / M.numel() * torch.linalg.norm((Z - M).squeeze(), ord='fro') ** 2
 
     rnuc = torch.linalg.norm(L.squeeze(), ord='nuc')
     sL1 = abs(S).sum()
@@ -102,6 +104,7 @@ for r, p in r_p:
     fig.suptitle(f'r={r} and p={p}')
 
     axes[0].plot(f_vals)
+    axes[0].set_ylim(0, 250)
     axes[0].set_title("Function values")
 
     axes[1].plot(sparse_comp)
