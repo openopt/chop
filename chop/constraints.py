@@ -11,6 +11,7 @@ Part of this code is adapted from https://github.com/ZIB-IOL."""
 from copy import deepcopy
 from collections import defaultdict
 import warnings
+import dataclasses
 
 import torch
 
@@ -431,9 +432,9 @@ class L2Ball(LpBall):
               1. for a Frank-Wolfe step.
         """
         update_direction = -iterate.clone().detach()
-        grad_norms = torch.norm(grad.view(grad.size(0), -1), p=2, dim=-1)
-        update_direction += self.alpha * (grad.view(grad.size(0), -1).T
-                                            / grad_norms).T.view_as(iterate)
+        grad_norms = torch.norm(grad.reshape(grad.size(0), -1), p=2, dim=-1)
+        update_direction += self.alpha * (grad.reshape(grad.size(0), -1).T
+                                          / grad_norms).T.reshape_as(iterate)
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
 
@@ -718,3 +719,18 @@ class Cone:
     def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         cosines = utils.bdot(x, self.directions)
         return abs(cosines) >= utils.bnorm(x) * self.cos_angle * (1. + rtol) + atol
+
+
+@dataclasses.dataclass
+class Polytope:
+
+    vertices: torch.Tensor
+
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
+        update_direction = -iterate.detach().clone()
+
+        similarities = self.vertices @ grad
+        top_vertex_index = torch.argmax(similarities)
+        update_direction += self.vertices[top_vertex_index]
+        return update_direction

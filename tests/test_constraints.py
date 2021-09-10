@@ -187,3 +187,20 @@ def test_model_constraint_maker(ord, constrain_bias):
         if prox:
             allclose = torch.allclose(param, prox(param.unsqueeze(0)).squeeze(0), rtol=5e-3, atol=5e-3)
             assert allclose
+
+
+@pytest.mark.parametrize('d', [2, 10])
+def test_polytope(d):
+    vertices = torch.zeros(2 * d, d)
+
+    for i in range(d):
+            vertices[i, i] = 1.
+            vertices[d + i, i] = -1.
+
+    constraint = chop.constraints.Polytope(vertices)
+
+    iterate = torch.zeros(d)
+    grad = torch.zeros(d)
+    grad[0] = 1.
+
+    assert torch.allclose(constraint.lmo(grad, iterate), grad)
