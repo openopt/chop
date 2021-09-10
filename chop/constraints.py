@@ -708,3 +708,28 @@ class Cone:
     def is_feasible(self, x, rtol=1e-5, atol=1e-7):
         cosines = utils.bdot(x, self.directions)
         return abs(cosines) >= utils.bnorm(x) * self.cos_angle * (1. + rtol) + atol
+
+
+@dataclasses.dataclass
+class Polytope:
+    """Constraint defined as the convex hull of a set of vertices.
+    
+    Attributes:
+      vertices: the vertices of the polytope.
+    """
+
+    vertices: torch.Tensor
+
+    @torch.no_grad()
+    def lmo(self, grad, iterate):
+        """Linear Oracle.
+        
+        Returns s - iterate, such that 
+        s = argmax_{s\\in vertices} \\langle s, grad \\rangle"""
+
+        update_direction = -iterate.detach().clone()
+
+        similarities = self.vertices @ grad
+        top_vertex_index = torch.argmax(similarities)
+        update_direction += self.vertices[top_vertex_index]
+        return update_direction
