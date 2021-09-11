@@ -732,4 +732,34 @@ class Polytope:
         similarities = self.vertices @ grad
         top_vertex_index = torch.argmax(similarities)
         update_direction += self.vertices[top_vertex_index]
-        return update_direction
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
+
+    @torch.no_grad()
+    def lmo_pairwise(self, grad, iterate, active_set):
+        """Outputs the parwise update direction.
+        
+        Returns u-v where 
+        u = argmax_{u\in vertices}  \\langle u, grad \\rangle
+        v = argmax_{v\in active set}  \\langle v, -grad \\rangle
+        
+        Args:
+          iterate: current iterate, not used here
+          grad: the direction to move towards
+          active_set: previously chosen vertices, and associated weights.
+        """
+        similarities = self.vertices @ grad.squeeze()
+        # FW direction
+        fw_idx = torch.argmax(similarities).item()
+        update_direction = self.vertices[fw_idx].detach().clone()
+
+        # Away direction
+        active_set_idx = torch.tensor(list(active_set.keys()))
+        mask = torch.zeros_like(similarities, dtype=torch.bool)
+        mask[active_set_idx] = 1.
+        masked_similarities = mask * similarities
+        masked_similarities[mask == 0] = float('inf')
+        away_idx = torch.argmin(masked_similarities).item()
+        update_direction -= self.vertices[away_idx]
+        max_step_size = active_set[away_idx]
+
+        return update_direction.unsqueeze(0), fw_idx, away_idx, max_step_size
