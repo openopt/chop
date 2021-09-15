@@ -11,7 +11,7 @@ Part of this code is adapted from https://github.com/ZIB-IOL."""
 from copy import deepcopy
 from collections import defaultdict
 import warnings
-
+import dataclasses
 import torch
 
 import numpy as np
