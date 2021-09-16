@@ -8,8 +8,9 @@ from functools import partial
 import matplotlib.pyplot as plt
 import torch
 
-from chop.constraints import LinfBall
+from chop.constraints import LinfBall, Polytope
 from chop.optim import minimize_frank_wolfe, minimize_pgd, minimize_pgd_madry, minimize_three_split
+from chop.optim import minimize_pairwise_frank_wolfe
 from chop import utils 
 
 torch.random.manual_seed(0)
@@ -17,14 +18,14 @@ torch.random.manual_seed(0)
 
 def setup_problem(make_nonconvex=False):
     alpha = 1.
-    x_star = torch.tensor([alpha, alpha/2]).unsqueeze(0)
+    x_star = torch.tensor([.9, .3]).unsqueeze(0)
     x_0 = torch.zeros_like(x_star)
 
     @utils.closure
     def loss_func(x):
         val = .5 * ((x - x_star) ** 2).sum()
         if make_nonconvex:
-            val += .1 * torch.sin(50 * torch.norm(x, p=1) + .1)
+            val += .01 * torch.sin(50 * torch.norm(x, p=1) + .1)
         return val
 
     constraint = LinfBall(alpha)
@@ -39,26 +40,28 @@ def log(kwargs, iterates, losses):
     losses.append(val)
 
 
-
 if __name__ == "__main__":
 
-    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=True)
-    iterations = 10
+    x_0, x_star, loss_func, constraint = setup_problem(make_nonconvex=False)
+    iterations = 300
 
     iterates_pgd = [x_0.squeeze().data]
     iterates_pgd_madry = [x_0.squeeze().data]
     iterates_splitting = [x_0.squeeze().data]
     iterates_fw = [x_0.squeeze().data]
+    iterates_pfw = [x_0.squeeze().data]
 
     losses_pgd = [loss_func(x_0, return_jac=False).data]
     losses_pgd_madry = [loss_func(x_0, return_jac=False).data]
     losses_splitting = [loss_func(x_0, return_jac=False).data]
     losses_fw = [loss_func(x_0, return_jac=False).data]
+    losses_pfw = [loss_func(x_0, return_jac=False).data]
 
     log_pgd = partial(log, iterates=iterates_pgd, losses=losses_pgd)
     log_pgd_madry = partial(log, iterates=iterates_pgd_madry, losses=losses_pgd_madry)
     log_splitting = partial(log, iterates=iterates_splitting, losses=losses_splitting)
     log_fw = partial(log, iterates=iterates_fw, losses=losses_fw)
+    log_pfw = partial(log, iterates=iterates_pfw, losses=losses_pfw)
 
     sol_pgd = minimize_pgd(loss_func, x_0, constraint.prox,
                            max_iter=iterations,
@@ -75,16 +78,30 @@ if __name__ == "__main__":
 
     sol_fw = minimize_frank_wolfe(loss_func, x_0, constraint.lmo, callback=log_fw,
                                   max_iter=iterations)
-
+    polytope = Polytope(vertices=torch.tensor([
+        [0, 0],
+                                                                [1, 1],
+                                                                [1, -1],
+                                                                [-1, 1],
+                                                                [-1, -1]
+                                                                ],
+                                                                dtype=torch.float))
+    sol_pfw = minimize_pairwise_frank_wolfe(loss_func, 0, polytope,
+                                            callback=log_pfw,
+                                            max_iter=iterations,
+                                            lipschitz=2.)
+                                  
     fig, ax = plt.subplots()
     ax.plot(losses_pgd, label="PGD")
     ax.plot(losses_pgd_madry, label="PGD Madry")
     ax.plot(losses_splitting, label="Operator Splitting")
     ax.plot(losses_fw, label="Frank-Wolfe")
+    ax.plot(losses_pfw, label="Pairwise Frank-Wolfe")
     fig.legend()
+    plt.savefig('losses.png')
     plt.show()
 
-    fig, ax = plt.subplots(ncols=2, nrows=2, sharex=True, sharey=True)
+    fig, ax = plt.subplots(ncols=3, nrows=2, sharex=True, sharey=True)
     ax = ax.flatten()
     ax[0].plot(*zip(*iterates_pgd), '-o', label="PGD", alpha=.6)
     ax[0].set_xlim(-1, 1)
@@ -106,4 +123,10 @@ if __name__ == "__main__":
     ax[3].set_ylim(-1, 1)
     ax[3].legend()
 
+    ax[4].plot(*zip(*iterates_pfw), '-o', label="Pairwise Frank-Wolfe", alpha=.6)
+    ax[4].set_xlim(-1, 1)
+    ax[4].set_ylim(-1, 1)
+    ax[4].legend()
+
     plt.show()
+    plt.savefig("Pairwise.png")
