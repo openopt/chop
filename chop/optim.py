@@ -12,11 +12,15 @@ https://github.com/openopt/copt.
 
 from numbers import Number
 import warnings
+from collections import defaultdict
+
 import torch
+
 import numpy as np
+
 from scipy import optimize
-from numbers import Number
 from chop import utils
+from chop import constraints
 
 
 def minimize_three_split(
@@ -522,7 +526,7 @@ def minimize_pairwise_frank_wolfe(
       callback: a callable callback function
     """
 
-    if not isinstance(polytope, chop.constraints.Polytope):
+    if not isinstance(polytope, constraints.Polytope):
       raise ValueError("polytope must be a `chop.constraints.Polytope`.")
 
     x = polytope.vertices[x0_idx].detach().clone()
@@ -546,7 +550,7 @@ def minimize_pairwise_frank_wolfe(
     for it in range(max_iter):
         update_direction, fw_idx, away_idx, max_step_size = polytope.lmo_pairwise(-grad, x, active_set)
         norm_update_direction = torch.linalg.norm(update_direction) ** 2
-        cert = cu.bdot(update_direction, -grad)
+        cert = utils.bdot(update_direction, -grad)
         
         if lipschitz_t is None:
             eps = 1e-3
@@ -575,7 +579,6 @@ def minimize_pairwise_frank_wolfe(
             step_size = min(step_size, max_step_size)
             fval_next, grad_next = closure(x + step_size * update_direction)
             
-
         if callback is not None:
             if callback(locals()) is False:  # pylint: disable=g-bool-id-comparison
                 break
@@ -594,7 +597,8 @@ def minimize_pairwise_frank_wolfe(
     if callback is not None:
         callback(locals())
 
-    return optimize.OptimizeResult(x=x.data, nit=it, certificate=cert, active_set=active_set)
+    return optimize.OptimizeResult(x=x.data, nit=it, certificate=cert, active_set=active_set,
+                                   fval=fval, grad=grad)
 
 
 def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, lipschitz=1e-3,
