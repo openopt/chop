@@ -763,12 +763,12 @@ class SplittingProxFW(Optimizer):
                     atom, scale = state['lmo'](
                         -state['grad_est'], state['y']
                     )
-                    atom /= torch.linalg.norm(atom)
-                    eff_step = .5 / (state['lipschitz'] * state['lr'])
-                    magnitude = (atom * (p - eff_step * state['grad_est'])).sum() - scale * eff_step
+                    atom_norm2 = torch.linalg.norm(atom) ** 2
+                    magnitude = (atom * (state['lipschitz'] * state['lr'] * p - state['grad_est'])).sum() - scale
                     magnitude = F.relu(magnitude)
+                    magnitude /= state['lipschitz'] * atom_norm2
                     w = magnitude * atom
-                    y_update = w - state['y']
+                    y_update = w - state['lr'] * state['y']
 
                 else:
                     y_update, max_step_size = state['lmo'](
