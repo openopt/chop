@@ -12,8 +12,11 @@ https://github.com/openopt/copt.
 
 from numbers import Number
 import warnings
+from tqdm import tqdm
+
 import torch
 import numpy as np
+
 from scipy import optimize
 from numbers import Number
 from chop import utils
@@ -153,7 +156,7 @@ def minimize_three_split(
     x = prox1(z - utils.bmul(step_size, grad), step_size, *args_prox)
     u = torch.zeros_like(x)
 
-    for it in range(max_iter):
+    for it in tqdm(range(max_iter)):
         z.requires_grad_(True)
         fval, grad = closure(z)
         with torch.no_grad():
@@ -316,7 +319,7 @@ def minimize_pgd(closure, x0, prox=None, step='backtracking', max_iter=200,
     else:
         raise ValueError("step must be float or backtracking or None")
 
-    for it in range(max_iter):
+    for it in tqdm(range(max_iter)):
 
         fval, grad = closure(x)
         x_next = prox(x - utils.bmul(step_size, grad), step_size, *prox_args)
@@ -410,7 +413,7 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
 
     cert = np.inf * torch.ones(batch_size, device=x.device)
 
-    for it in range(max_iter):
+    for it in tqdm(range(max_iter)):
 
         x.requires_grad = True
         fval, grad = closure(x)
@@ -511,7 +514,7 @@ def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, lipschitz
 
     fval, grad = closure(x + y)
 
-    for it in range(max_iter):
+    for it in tqdm(range(max_iter)):
 
         if step == 'sublinear':
             step_size = 2. / (it + 2) * torch.ones(batch_size, device=x.device)
