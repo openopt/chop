@@ -732,4 +732,4 @@ class Polytope:
         similarities = self.vertices @ grad
         top_vertex_index = torch.argmax(similarities)
         update_direction += self.vertices[top_vertex_index]
-        return update_direction
+        return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
