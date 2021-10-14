@@ -527,11 +527,14 @@ def minimize_pairwise_frank_wolfe(
     """
 
     if not isinstance(polytope, constraints.Polytope):
-      raise ValueError("polytope must be a `chop.constraints.Polytope`.")
+        raise ValueError("polytope must be a `chop.constraints.Polytope`.")
 
-    x = polytope.vertices[x0_idx].detach().clone()
-    x = x.unsqueeze(0)
+    if polytope.vertices.size(0) != 1:
+        raise NotImplementedError("This optimizer can only handle one problem instance at a time for now.")
+
+    x = polytope.vertices[:, x0_idx].detach().clone()
     active_set = defaultdict(float)
+    
     active_set[x0_idx] = 1.
 
     cert = float('inf')
