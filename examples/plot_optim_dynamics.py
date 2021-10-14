@@ -85,7 +85,7 @@ if __name__ == "__main__":
                                                                 [-1, 1],
                                                                 [-1, -1]
                                                                 ],
-                                                                dtype=torch.float))
+                                                                dtype=torch.float).unsqueeze(0))
     sol_pfw = minimize_pairwise_frank_wolfe(loss_func, 0, polytope,
                                             callback=log_pfw,
                                             max_iter=iterations,
