@@ -728,8 +728,9 @@ class Polytope:
         s = argmax_{s\\in vertices} \\langle s, grad \\rangle"""
 
         batch_size = grad.size(0)
-
+        
         update_direction = -iterate.detach().clone()
+
         similarities = utils.bmv(self.vertices, grad)
         top_vertex_index = torch.argmax(similarities, dim=-1)
         update_direction += self.vertices[range(batch_size), top_vertex_index]
@@ -748,10 +749,11 @@ class Polytope:
           grad: the direction to move towards
           active_set: previously chosen vertices, and associated weights.
         """
-        similarities = self.vertices @ grad.squeeze()
+        vertices = self.vertices.squeeze()
+        similarities = vertices @ grad.squeeze()
         # FW direction
         fw_idx = torch.argmax(similarities).item()
-        update_direction = self.vertices[fw_idx].detach().clone()
+        update_direction = vertices[fw_idx].detach().clone()
 
         # Away direction
         active_set_idx = torch.tensor(list(active_set.keys()))
@@ -760,7 +762,7 @@ class Polytope:
         masked_similarities = mask * similarities
         masked_similarities[mask == 0] = float('inf')
         away_idx = torch.argmin(masked_similarities).item()
-        update_direction -= self.vertices[away_idx]
+        update_direction -= vertices[away_idx]
         max_step_size = active_set[away_idx]
 
         return update_direction.unsqueeze(0), fw_idx, away_idx, max_step_size

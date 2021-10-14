@@ -189,7 +189,7 @@ def test_model_constraint_maker(ord, constrain_bias):
 
 
 @pytest.mark.parametrize('d', [2, 10])
-def test_polytope(d):
+def test_polytope_lmo(d):
     vertices = torch.zeros(1, 2 * d, d)
 
     for i in range(d):
@@ -203,3 +203,20 @@ def test_polytope(d):
     grad[0] = 1.
 
     assert torch.allclose(constraint.lmo(grad.unsqueeze(0), iterate.unsqueeze(0))[0], grad)
+
+@pytest.mark.parametrize('d', [2, 10])
+def test_polytope_lmo_pairwise(d):
+
+    vertices = torch.zeros(1, 2 * d, d)
+
+    for i in range(d):
+        vertices[0, i, i] = 1.
+        vertices[0, d + i, i] = -1.
+
+    constraint = chop.constraints.Polytope(vertices)
+
+    iterate = torch.zeros(d)
+    grad = torch.zeros(d)
+    grad[0] = 1.
+
+    constraint.lmo_pairwise(grad.unsqueeze(0), iterate.unsqueeze(0), active_set={0: 1.})
