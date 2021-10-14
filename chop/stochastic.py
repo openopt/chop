@@ -448,8 +448,10 @@ class FrankWolfe(Optimizer):
 
     def __init__(self, params, lmo, lr=.1, momentum=.9,
                  weight_decay=0.,
-                 normalization='none'):
+                 normalization='none', track_active_set=False):
 
+        self.track_active_set = track_active_set
+        
         lmo_candidates = []
         for oracle in lmo:
             if oracle is None:
@@ -528,6 +530,8 @@ class FrankWolfe(Optimizer):
                     state['step'] = 0
                     state['grad_estimate'] = torch.zeros_like(
                         p, memory_format=torch.preserve_format)
+                    if self.track_active_set:
+                        state['active_set'] = {p.detach().clone(): 1.}
 
                 if self.lr == 'sublinear':
                     step_size = 1. / (state['step'] + 1.)
@@ -553,5 +557,7 @@ class FrankWolfe(Optimizer):
                 elif self.normalization == 'none':
                     pass
                 p.add_(step_size * update_direction)
+                
+                # TODO(gnegiar): update active set here
                 idx += 1
         return loss
