@@ -190,11 +190,11 @@ def test_model_constraint_maker(ord, constrain_bias):
 
 @pytest.mark.parametrize('d', [2, 10])
 def test_polytope(d):
-    vertices = torch.zeros(2 * d, d)
+    vertices = torch.zeros(1, 2 * d, d)
 
     for i in range(d):
-            vertices[i, i] = 1.
-            vertices[d + i, i] = -1.
+        vertices[0, i, i] = 1.
+        vertices[0, d + i, i] = -1.
 
     constraint = chop.constraints.Polytope(vertices)
 
@@ -202,4 +202,4 @@ def test_polytope(d):
     grad = torch.zeros(d)
     grad[0] = 1.
 
-    assert torch.allclose(constraint.lmo(grad, iterate), grad)
+    assert torch.allclose(constraint.lmo(grad.unsqueeze(0), iterate.unsqueeze(0))[0], grad)

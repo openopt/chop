@@ -715,10 +715,10 @@ class Polytope:
     """Constraint defined as the convex hull of a set of vertices.
     
     Attributes:
-      vertices: the vertices of the polytope.
+      vertices: the vertices of the polytope. Shape (batch_size, *)
     """
 
-    vertices: torch.Tensor
+    vertices: torch.Tensor 
 
     @torch.no_grad()
     def lmo(self, grad, iterate):
@@ -727,11 +727,12 @@ class Polytope:
         Returns s - iterate, such that 
         s = argmax_{s\\in vertices} \\langle s, grad \\rangle"""
 
-        update_direction = -iterate.detach().clone()
+        batch_size = grad.size(0)
 
-        similarities = self.vertices @ grad
-        top_vertex_index = torch.argmax(similarities)
-        update_direction += self.vertices[top_vertex_index]
+        update_direction = -iterate.detach().clone()
+        similarities = utils.bmv(self.vertices, grad)
+        top_vertex_index = torch.argmax(similarities, dim=-1)
+        update_direction += self.vertices[range(batch_size), top_vertex_index]
         return update_direction, torch.ones(iterate.size(0), device=iterate.device, dtype=iterate.dtype)
 
     @torch.no_grad()
