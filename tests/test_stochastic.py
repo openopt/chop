@@ -4,6 +4,8 @@ import numpy as np
 import torch
 import pytest
 import shutil
+
+# TODO: remove cox dependency
 from cox.store import Store
 
 import chop
@@ -16,6 +18,7 @@ MAX_ITER = 300
 
 torch.manual_seed(0)
 
+# TODO: put this in a setup function
 # Set up random regression problem
 alpha = 1.0
 n_samples, n_features = 20, 15
@@ -70,6 +73,7 @@ def test_L1Ball(algorithm, lr):
     cert = torch.tensor(np.inf)
     for ii in range(MAX_ITER):
         optimizer.zero_grad()
+        # TODO: make this stochastic, use a dataloader
         loss = criterion(X.mv(w_t), y)
         loss.backward()
 
@@ -94,6 +98,8 @@ def test_L1Ball(algorithm, lr):
 
 
 def test_FW_active_set():
+    """Tests active set capabilities.
+    Weight vector should be in the simplex."""
 
     constraint = chop.constraints.L1Ball(alpha)
     lmo = constraint.lmo
@@ -101,4 +107,21 @@ def test_FW_active_set():
     w_t = torch.zeros_like(w)
     w_t.requires_grad = True
 
-    optimizer = stochastic.FrankWolfe(w_t, lmo, track_active_set=True)
+    optimizer = stochastic.FrankWolfe(
+        [w_t], [lmo], momentum=0.0, track_active_set=True
+    )
+    criterion = torch.nn.MSELoss(reduction="mean")
+    for ii in range(MAX_ITER):
+        optimizer.zero_grad()
+        # TODO: make this stochastic, use a dataloader
+        loss = criterion(X.mv(w_t), y)
+        loss.backward()
+
+        optimizer.step()
+
+    active_set = optimizer.state[w_t]["active_set"]
+
+    for weight in active_set.values():
+        assert 0.0 <= weight <= 1.0
+
+    assert np.allclose(sum(active_set.values()), 1.0)

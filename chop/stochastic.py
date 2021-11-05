@@ -11,6 +11,8 @@ The API in this module is inspired by torch.optim.
 
 import warnings
 
+import collections
+
 import torch
 from torch.optim import Optimizer
 import numpy as np
@@ -615,7 +617,8 @@ class FrankWolfe(Optimizer):
                         p, memory_format=torch.preserve_format
                     )
                     if self.track_active_set:
-                        state["active_set"] = {p.detach().clone(): 1.0}
+                        state["active_set"] = collections.defaultdict(float)
+                        state["active_set"][p.detach().clone()] = 1.0
 
                 if self.lr == "sublinear":
                     step_size = 1.0 / (state["step"] + 1.0)
@@ -651,6 +654,15 @@ class FrankWolfe(Optimizer):
                     pass
                 p.add_(step_size * update_direction)
 
-                # TODO(gnegiar): update active set here
+                # Update active set
+                if self.track_active_set:
+                    active_set = state["active_set"]
+                    curr_atom = update_direction + p
+                    for vertex in list(active_set):
+                        active_set[vertex] *= 1 - step_size
+                        if active_set[vertex] < 1e-7:
+                            del active_set[vertex]
+                    active_set[curr_atom] += step_size
+                    state["active_set"] = active_set
                 idx += 1
         return loss
