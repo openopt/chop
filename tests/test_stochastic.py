@@ -2,7 +2,6 @@
 
 import numpy as np
 import torch
-from torch.autograd import Variable
 import pytest
 import shutil
 from cox.store import Store
@@ -46,7 +45,8 @@ def test_L1Ball(algorithm, lr):
     prox = constraint.prox
     lmo = constraint.lmo
     assert (constraint.prox(w) == w).all()
-    w_t = Variable(torch.zeros_like(w), requires_grad=True)
+    w_t = torch.zeros_like(w)
+    w_t.requires_grad = True
 
     constraint_oracles = {
         stochastic.PGD.name: {"prox": [prox]},
@@ -91,3 +91,14 @@ def test_L1Ball(algorithm, lr):
         store[optimizer.name].flush_row()
 
     store.close()
+
+
+def test_FW_active_set():
+
+    constraint = chop.constraints.L1Ball(alpha)
+    lmo = constraint.lmo
+    assert (constraint.prox(w) == w).all()
+    w_t = torch.zeros_like(w)
+    w_t.requires_grad = True
+
+    optimizer = stochastic.FrankWolfe(w_t, lmo, track_active_set=True)
