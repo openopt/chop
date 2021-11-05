@@ -12,11 +12,15 @@ https://github.com/openopt/copt.
 
 from numbers import Number
 import warnings
+from collections import defaultdict
+
 import torch
+
 import numpy as np
+
 from scipy import optimize
-from numbers import Number
 from chop import utils
+from chop import constraints
 
 
 def minimize_three_split(
@@ -431,6 +435,173 @@ def minimize_frank_wolfe(closure, x0, lmo, step='sublinear',
     fval, grad = closure(x)
     return optimize.OptimizeResult(x=x, nit=it, fval=fval, grad=grad,
                                    certificate=cert)
+
+
+def update_active_set(active_set,
+                      fw_idx, away_idx,
+                      step_size):
+
+    max_step_size = active_set[away_idx]
+    active_set[fw_idx] += step_size
+    active_set[away_idx] -= step_size
+    
+    if active_set[away_idx] == 0.:
+        # drop step: remove vertex from active set
+        del active_set[away_idx]
+    if active_set[away_idx] < 0.:
+        raise ValueError(f"The step size used is too large. "
+                         f"{step_size: .3f} vs. {max_step_size:.3f}")
+
+    return active_set
+
+
+def backtracking_fw(
+    x,
+    fval,
+    old_fval,
+    closure,
+    certificate,
+    lipschitz_t,
+    max_step_size,
+    update_direction,
+    norm_update_direction,
+    tol=torch.finfo(torch.float32).eps
+    ):
+    """Performs backtracking line search for Frank-Wolfe algorithms."""
+
+    ratio_decrease = .9
+    ratio_increase = 2.
+    max_linesearch_iter = 100
+
+    if old_fval is not None:
+        tmp = (certificate ** 2) / (2 * (old_fval - fval) * norm_update_direction)
+        lipschitz_t = max(min(tmp, lipschitz_t), lipschitz_t * ratio_decrease)
+
+    for _ in range(max_linesearch_iter):
+        step_size_t = certificate / (norm_update_direction * lipschitz_t)
+        if step_size_t < max_step_size:
+            rhs = -0.5 * step_size_t * certificate
+        else:
+            step_size_t = max_step_size
+            rhs = (
+                -step_size_t * certificate
+                + 0.5 * (step_size_t ** 2) * lipschitz_t * norm_update_direction
+            )
+        fval_next, grad_next = closure(x + step_size_t * update_direction)
+        if fval_next - fval <= rhs + tol:
+            # .. sufficient decrease condition verified ..
+            break
+        else:
+            lipschitz_t *= ratio_increase
+    else:
+        warnings.warn(
+            "Exhausted line search iterations in minimize_frank_wolfe", RuntimeWarning
+        )
+    return step_size_t, lipschitz_t, fval_next, grad_next
+
+
+def minimize_pairwise_frank_wolfe(
+    closure,
+    x0_idx,
+    polytope,
+    step='backtracking',
+    lipschitz=None,
+    max_iter=200,
+    tol=1e-6,
+    callback=None
+    ):
+    """Minimize using Pairwise Frank-Wolfe.
+    
+    WARNING: This implementation is different from other functions in this file.
+    As of now, it does not handle batched problems, and only handles Polytope constraints.
+
+    Args:
+      closure: closure of the function to minimize
+      x0_idx: the starting vertex on the polytope
+      polytope: the polytope constraint
+      step: backtracking line search as defined in [1]
+      lipschitz: an initial Lipschitz estimate of the gradient
+      max_iter: maximum number of iterations
+      tol: tolerance on the Frank-Wolfe gap
+      callback: a callable callback function
+    """
+
+    if not isinstance(polytope, constraints.Polytope):
+        raise ValueError("polytope must be a `chop.constraints.Polytope`.")
+
+    if polytope.vertices.size(0) != 1:
+        raise NotImplementedError("This optimizer can only handle one problem instance at a time for now.")
+
+    x = polytope.vertices[:, x0_idx].detach().clone()
+    active_set = defaultdict(float)
+    
+    active_set[x0_idx] = 1.
+
+    cert = float('inf')
+
+    x.requires_grad = True
+    fval, grad = closure(x)
+    old_fval = None
+
+
+    lipschitz_t = None
+    step_size = None
+
+    if lipschitz is not None:
+        lipschitz_t = lipschitz 
+
+    for it in range(max_iter):
+        update_direction, fw_idx, away_idx, max_step_size = polytope.lmo_pairwise(-grad, x, active_set)
+        norm_update_direction = torch.linalg.norm(update_direction) ** 2
+        cert = utils.bdot(update_direction, -grad)
+        
+        if lipschitz_t is None:
+            eps = 1e-3
+            grad_eps = closure(x + eps * update_direction)[1]
+            lipschitz_t = torch.linalg.norm(grad-grad_eps) / (
+                eps * torch.sqrt(norm_update_direction)
+            )
+            print(f"Estimated L_t = {lipschitz_t}")
+
+        if cert <= tol:
+            break
+
+        if step == 'DR':
+            step_size = min(
+                cert / (norm_update_direction * lipschitz_t), max_step_size
+            )
+            fval_next, grad_next = closure(x + step_size * update_direction)
+        elif step == 'backtracking':
+            step_size, lipschitz_t, fval_next, grad_next = backtracking_fw(
+                x, fval, old_fval, closure, cert, lipschitz_t, max_step_size,
+                update_direction, norm_update_direction
+            )
+            
+        elif step == 'sublinear':
+            step_size = 2. / (it + 2.)
+            step_size = min(step_size, max_step_size)
+            fval_next, grad_next = closure(x + step_size * update_direction)
+            
+        if callback is not None:
+            if callback(locals()) is False:  # pylint: disable=g-bool-id-comparison
+                break
+
+        with torch.no_grad():
+            x.add_(step_size * update_direction)
+
+        update_active_set(
+            active_set,
+            fw_idx,
+            away_idx,
+            step_size)
+
+        old_fval = fval
+        fval, grad = fval_next, grad_next
+    if callback is not None:
+        callback(locals())
+
+    return optimize.OptimizeResult(x=x.data, nit=it, certificate=cert, active_set=active_set,
+                                   fval=fval, grad=grad)
 
 
 def minimize_alternating_fw_prox(closure, x0, y0, prox=None, lmo=None, lipschitz=1e-3,
