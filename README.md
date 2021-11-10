@@ -11,6 +11,9 @@
 ## Stochastic Algorithms
 
 We define stochastic optimizers in the `chop.stochastic` module. These follow PyTorch Optimizer conventions, similar to the `torch.optim` module.
+These can be used to 
+- train structured models;
+- compute universal adversarial perturbations over a dataset.
 
 ## Full Gradient Algorithms
 
