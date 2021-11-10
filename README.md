@@ -1,4 +1,4 @@
-# pytorCH OPtimize: a library for continuous and constrained optimization built on PyTorch
+# pytorCH OPtimize (CHOP): a library for continuous and constrained optimization built on PyTorch
 
 ...with applications to adversarially attacking and training neural networks.
 
