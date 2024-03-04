@@ -6,7 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/openopt/chop/badge.svg?branch=master)](https://coveralls.io/github/openopt/chop?branch=master)
 [![DOI](https://zenodo.org/badge/310693245.svg)](https://zenodo.org/badge/latestdoi/310693245)
 
-:warning: This library is in early development, API might change without notice. The examples will be kept up to date. :warning:
+:warning: This library is not actively maintained anymore, and I won't be handling new issues in a timely manner. Contact me if you'd like to contribute. :warning:
 
 ## Stochastic Algorithms
 
@@ -57,6 +57,6 @@ If this software is useful to your research, please consider citing it as
 
 ## Affiliations
 
-Geoffrey Négiar is in the Mahoney lab and the El Ghaoui lab at UC Berkeley.
+Geoffrey Négiar was in the Mahoney lab and the El Ghaoui lab at UC Berkeley at the time this package was developped.
 
 Fabian Pedregosa is at Google Research.
